@@ -1,22 +1,42 @@
-import BlankNode from './blank-node'
 import DataFactory from './data-factory'
 import jsonld from 'jsonld'
-import Literal from './literal'
 import { Parser as N3jsParser } from 'n3'  // @@ Goal: remove this dependency
 import N3Parser from './n3parser'
-import NamedNode from './named-node'
 import { parseRDFaDOM } from './rdfaparser'
 import RDFParser from './rdfxmlparser'
 import sparqlUpdateParser from './patch-parser'
 import * as Util from './util'
+import Formula from './formula';
+
+export type mimeTypes =
+  'application/ld+json' |
+  'application/n-quads' |
+  'application/nquads' |
+  'application/rdf+xml' |
+  'application/sparql-update' |
+  'application/xhtml+xml' |
+  'text/html' |
+  'text/n3' |
+  'text/turtle'
 
 /**
  * Parse a string and put the result into the graph kb.
  * Normal method is sync.
  * Unfortunately jsdonld is currently written to need to be called async.
  * Hence the mess below with executeCallback.
+ * @param str The input string to parse
+ * @param kb The store to use
+ * @param base The base URI to use
+ * @param contentType The content type for the input
+ * @param callback The callback to call when the data has been loaded
  */
-export default function parse (str, kb, base, contentType, callback) {
+export default function parse (
+  str: string,
+  kb: Formula,
+  base: string,
+  contentType: string,
+  callback: (error: any, kb: Formula) => void
+) {
   contentType = contentType || 'text/turtle'
   contentType = contentType.split(';')[0]
   try {
@@ -41,7 +61,6 @@ export default function parse (str, kb, base, contentType, callback) {
                contentType === 'application/nquads' ||
                contentType === 'application/n-quads') {
       var n3Parser = new N3jsParser({ factory: DataFactory })
-      var triples = []
       if (contentType === 'application/ld+json') {
         var jsonDocument
         try {

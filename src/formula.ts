@@ -1,4 +1,3 @@
-'use strict'
 import BlankNode from './blank-node'
 import ClassOrder from './class-order'
 import Collection from './collection'
@@ -10,18 +9,33 @@ import Node from './node-internal'
 import Serializer from './serialize'
 import Statement from './statement'
 import Variable from './variable'
+import { ValueType, Bindings } from './types'
 
-/** @module formula */
-
+/**
+ * A formula, or store of RDF statements
+ * @module formula
+*/
 export default class Formula extends Node {
   /**
-  * @constructor
-  * @param statements - Initial array of statements
-  * @param constraints - initial array of constraints
-  * @param initBindings - initial bindings used in Query
-  * @param optional - optional
-  */
-  constructor (statements, constraints, initBindings, optional) {
+   * The stored statements
+   */
+  statements: Statement[];
+
+  /**
+   * Initializes this formula
+   * @param statements The initial statements in this formulat
+   * @param constraints The additional constraints
+   * @param initBindings The initial bindings
+   * @param optional
+   */
+  constructor(
+    statements: ReadonlyArray<Statement>,
+    constraints: ReadonlyArray<any>,
+    initBindings: {
+        [id: string]: Node;
+    },
+    optional: ReadonlyArray<any>
+  ){
     super()
     this.termType = Formula.termType
     this.statements = statements || []
@@ -29,26 +43,45 @@ export default class Formula extends Node {
     this.initBindings = initBindings || []
     this.optional = optional || []
   }
+
+  /**
+   * Gets a namespace for the specified namespace's URI
+   * @param nsuri The URI for the namespace
+   */
+  ns(nsuri: string): (ln: string) => NamedNode;
+
+  static termType: string;
+
   /** Add a statement from its parts
   * @param {Node} subject - the first part of the statemnt
   * @param {Node} predicate - the second part of the statemnt
   * @param {Node} obbject - the third part of the statemnt
   * @param {Node} graph - the last part of the statemnt
   */
-  add (subject, predicate, object, graph) {
+  add (subject: Node, predicate: NamedNode, object: Node, graph: NamedNode) {
     return this.statements.push(new Statement(subject, predicate, object, graph))
   }
+
   /** Add a statment object
   * @param {Statement} statement - an existing constructed statement to add
   */
-  addStatement (st) {
+  addStatement (st: Statement): number {
     return this.statements.push(st)
   }
-  bnode (id) {
+
+  /**
+   * Gets a blank node
+   * @param id The node's identifier
+   */
+  bnode(id: string): BlankNode {
     return new BlankNode(id)
   }
 
-  addAll (statements) {
+  /**
+   * Adds all the statements to this formula
+   * @param statements A collection of statements
+   */
+  addAll (statements: Statement[]): void {
     statements.forEach(quad => {
       this.add(quad.subject, quad.predicate, quad.object, quad.graph)
     })
@@ -66,7 +99,12 @@ export default class Formula extends Node {
   * @param {Node} graph - A node to search for as graph, or if null, a wildcard
   * @returns {Node} - A node which match the wildcard position, or null
   */
-  any (s, p, o, g) {
+  any(
+    s?: Node | null,
+    p?: Node | null,
+    o?: Node | null,
+    g?: Node | null
+  ): Node | null | void {
     var st = this.anyStatementMatching(s, p, o, g)
     if (st == null) {
       return void 0
@@ -80,17 +118,54 @@ export default class Formula extends Node {
     return void 0
   }
 
-  anyValue (s, p, o, g) {
+  /**
+   * Gets the value of a node that matches the specified pattern
+   * @param s The subject
+   * @param p The predicate
+   * @param o The object
+   * @param g The graph that contains the statement
+   */
+  anyValue(
+    s?: Node | null,
+    p?: Node | null,
+    o?: Node | null,
+    g?: Node | null
+  ): string | void {
     var y = this.any(s, p, o, g)
     return y ? y.value : void 0
   }
 
-  anyJS (s, p, o, g) {
+
+  /**
+   * Gets the first JavaScript object equivalent to a node based on the specified pattern
+   * @param s The subject
+   * @param p The predicate
+   * @param o The object
+   * @param g The graph that contains the statement
+   */
+  anyJS(
+    s?: Node | null,
+    p?: Node | null,
+    o?: Node | null,
+    g?: Node | null
+  ): any {
     var y = this.any(s, p, o, g)
     return y ? Node.toJS(y) : void 0
   }
 
-  anyStatementMatching (subj, pred, obj, why) {
+  /**
+   * Gets the first statement that matches the specified pattern
+   * @param subj The subject
+   * @param pred The predicate
+   * @param obj The object
+   * @param why The graph that contains the statement
+   */
+  anyStatementMatching(
+    subj?: Node | null,
+    pred?: Node | null,
+    obj?: Node | null,
+    why?: Node | null
+  ): Statement | undefined {
     var x = this.statementsMatching(subj, pred, obj, why, true)
     if (!x || x.length === 0) {
       return undefined
@@ -102,29 +177,41 @@ export default class Formula extends Node {
    *
    * This is really a teaching method as to do this properly you would use IndexedFormula
    *
-   * @param {Node} subject - A node to search for as subject, or if null, a wildcard
-   * @param {Node} predicate - A node to search for as predicate, or if null, a wildcard
-   * @param {Node} object - A node to search for as object, or if null, a wildcard
-   * @param {Node} graph - A node to search for as graph, or if null, a wildcard
-   * @param {Boolean} justOne - flag - stop when found one rather than get all of them?
+   * @param subject - A node to search for as subject, or if null, a wildcard
+   * @param predicate - A node to search for as predicate, or if null, a wildcard
+   * @param object - A node to search for as object, or if null, a wildcard
+   * @param graph - A node to search for as graph, or if null, a wildcard
+   * @param justOne - flag - stop when found one rather than get all of them?
    * @returns {Array<Node>} - An array of nodes which match the wildcard position
    */
-  statementsMatching (subj, pred, obj, why, justOne) {
+  statementsMatching(
+    subj?: Node | null,
+    pred?: Node | null,
+    obj?: Node | null,
+    why?: Node | null,
+    justOne?: boolean
+    ): Statement[] {
     let found = this.statements.filter(st =>
       (!subj || subj.sameTerm(st.subject)) &&
       (!pred || pred.sameTerm(st.predicate)) &&
-      (!obj || subj.sameTerm(st.object)) &&
+      (!obj || obj.sameTerm(st.object)) &&
       (!why || why.sameTerm(st.subject))
      )
     return found
   }
+
   /**
    * Finds the types in the list which have no *stored* subtypes
    * These are a set of classes which provide by themselves complete
    * information -- the other classes are redundant for those who
    * know the class DAG.
+   * @param types A map of the types
    */
-  bottomTypeURIs (types) {
+  bottomTypeURIs(types: {
+    [id: string]: string | NamedNode;
+  }): {
+      [id: string]: string | NamedNode;
+  } {
     var bots
     var bottom
     var elt
@@ -155,7 +242,11 @@ export default class Formula extends Node {
     }
     return bots
   }
-  collection () {
+
+  /**
+   * Gets a new collection
+   */
+  collection (): Collection {
     return new Collection()
   }
 
@@ -165,17 +256,22 @@ export default class Formula extends Node {
   * each(me, knows, null, null)  - people I know accoring to anything in store .
   * each(null, knows, me, null)  - people who know me accoring to anything in store .
   *
-  * @param {Node} subject - A node to search for as subject, or if null, a wildcard
-  * @param {Node} predicate - A node to search for as predicate, or if null, a wildcard
-  * @param {Node} object - A node to search for as object, or if null, a wildcard
-  * @param {Node} graph - A node to search for as graph, or if null, a wildcard
-  * @returns {Array<Node>} - An array of nodes which match the wildcard position
+  * @param subject - A node to search for as subject, or if null, a wildcard
+  * @param predicate - A node to search for as predicate, or if null, a wildcard
+  * @param object - A node to search for as object, or if null, a wildcard
+  * @param graph - A node to search for as graph, or if null, a wildcard
+  * @returns - An array of nodes which match the wildcard position
   */
-  each (s, p, o, g) {
+  each(
+    s?: Node | null,
+    p?: Node | null,
+    o?: Node | null,
+    g?: Node | null
+  ): Node[] {
     var elt, i, l, m, q
     var len, len1, len2, len3
     var results = []
-    var sts = this.statementsMatching(s, p, o, g, false)
+    var sts = this.statementsMatching(s, p, o, g)
     if (s == null) {
       for (i = 0, len = sts.length; i < len; i++) {
         elt = sts[i]
@@ -199,20 +295,17 @@ export default class Formula extends Node {
     }
     return results
   }
-  equals (other) {
+
+  /**
+   * Gets whether this formula is equals to the other one
+   * @param other The other formula
+   */
+  equals(other: Formula): boolean {
     if (!other) {
       return false
     }
     return this.hashString() === other.hashString()
   }
-  /*
-  For thisClass or any subclass, anything which has it is its type
-  or is the object of something which has the type as its range, or subject
-  of something which has the type as its domain
-  We don't bother doing subproperty (yet?)as it doesn't seeem to be used much.
-  Get all the Classes of which we can RDFS-infer the subject is a member
-  @returns a hash of URIs
-  */
 
   /**
    * For thisClass or any subclass, anything which has it is its type
@@ -221,9 +314,14 @@ export default class Formula extends Node {
    * We don't bother doing subproperty (yet?)as it doesn't seeem to be used
    * much.
    * Get all the Classes of which we can RDFS-infer the subject is a member
+   * @param thisClass A named node
    * @return a hash of URIs
    */
-  findMembersNT (thisClass) {
+  findMembersNT(
+    thisClass: Node
+  ): {
+      [uri: string]: Statement;
+  } {
     var i
     var l
     var len
@@ -283,46 +381,78 @@ export default class Formula extends Node {
     }
     return members
   }
-  findMemberURIs (subject) {
+
+  /**
+   * For thisClass or any subclass, anything which has it is its type
+   * or is the object of something which has the type as its range, or subject
+   * of something which has the type as its domain
+   * We don't bother doing subproperty (yet?)as it doesn't seeem to be used
+   * much.
+   * Get all the Classes of which we can RDFS-infer the subject is a member
+   * @param subject A named node
+   */
+  findMemberURIs(
+    subject: Node
+  ): {
+      [uri: string]: Statement;
+  } {
     return this.NTtoURI(this.findMembersNT(subject))
   }
+
   /**
    * Get all the Classes of which we can RDFS-infer the subject is a superclass
    * Returns a hash table where key is NT of type and value is statement why we
    * think so.
    * Does NOT return terms, returns URI strings.
    * We use NT representations in this version because they handle blank nodes.
+   * @param subject A subject node
    */
-  findSubClassesNT (subject) {
+  findSubClassesNT(
+    subject: Node
+  ): {
+      [uri: string]: boolean;
+  } {
     var types = {}
     types[subject.toNT()] = true
     return this.transitiveClosure(types,
       this.sym('http://www.w3.org/2000/01/rdf-schema#subClassOf'), true)
   }
+
   /**
    * Get all the Classes of which we can RDFS-infer the subject is a subclass
-   * @param {NamedNode} subject - The thing whose classes are to be found
-   * @returns a hash table where key is NT of type and value is statement why we
+   * Returns a hash table where key is NT of type and value is statement why we
    * think so.
    * Does NOT return terms, returns URI strings.
    * We use NT representations in this version because they handle blank nodes.
+   * @param subject A subject node
+   * @returns a hash table where key is NT of type and value is statement why we
+   * think so.
    */
-  findSuperClassesNT (subject) {
+  findSuperClassesNT(
+      subject: Node
+    ): {
+        [uri: string]: boolean;
+    } {
     var types = {}
     types[subject.toNT()] = true
     return this.transitiveClosure(types,
       this.sym('http://www.w3.org/2000/01/rdf-schema#subClassOf'), false)
   }
+
   /**
    * Get all the Classes of which we can RDFS-infer the subject is a member
    * todo: This will loop is there is a class subclass loop (Sublass loops are
    * not illegal)
-   * @param {NamedNode} subject - The thing whose classes are to be found
+   * @param subject - The thing whose classes are to be found
    * @returns a hash table where key is NT of type and value is statement why we think so.
    * Does NOT return terms, returns URI strings.
    * We use NT representations in this version because they handle blank nodes.
    */
-  findTypesNT (subject) {
+  findTypesNT(
+    subject: Node
+  ): {
+      [uri: string]: boolean;
+  } {
     var domain
     var i
     var l
@@ -366,16 +496,36 @@ export default class Formula extends Node {
     }
     return this.transitiveClosure(types, this.sym('http://www.w3.org/2000/01/rdf-schema#subClassOf'), false)
   }
-  findTypeURIs (subject) {
+
+  /**
+   * Get all the Classes of which we can RDFS-infer the subject is a member
+   * todo: This will loop is there is a class subclass loop (Sublass loops are
+   * not illegal)
+   * Returns a hash table where key is NT of type and value is statement why we
+   * think so.
+   * Does NOT return terms, returns URI strings.
+   * We use NT representations in this version because they handle blank nodes.
+   * @param subject A subject node
+   */
+  findTypeURIs(
+    subject: Node
+  ): {
+      [uri: string]: boolean;
+  } {
     return this.NTtoURI(this.findTypesNT(subject))
   }
+
   /** Trace statements which connect directly, or through bnodes
    *
-   * @param {NamedNode} subject - The node to start looking for statments
-   * @param {NamedNode} doc - The document to be searched, or null to search all documents
+   * @param subject - The node to start looking for statments
+   * @param doc - The document to be searched, or null to search all documents
    * @returns an array of statements, duplicate statements are suppresssed.
    */
-  connectedStatements (subject, doc, excludePredicateURIs) {
+  connectedStatements(
+    subject: Node,
+    doc: ValueType,
+    excludePredicateURIs: ReadonlyArray<string>
+  ): Statement[] {
     excludePredicateURIs = excludePredicateURIs || []
     var todo = [subject]
     var done = []
@@ -412,16 +562,21 @@ export default class Formula extends Node {
     return result
   }
 
-  formula () {
+  /**
+   * Creates a new empty formula - features not applicable, but necessary for typing to pass
+   */
+  formula(features?: ReadonlyArray<string>): Formula {
     return new Formula()
   }
+
   /**
    * Transforms an NTriples string format into a Node.
    * The bnode bit should not be used on program-external values; designed
    * for internal work such as storing a bnode id in an HTML attribute.
    * This will only parse the strings generated by the vaious toNT() methods.
+   * @param str A string representation
    */
-  fromNT (str) {
+  fromNT(str: string): Node {
     var dt, k, lang
     switch (str[0]) {
       case '<':
@@ -452,7 +607,19 @@ export default class Formula extends Node {
     throw new Error("Can't convert from NT: " + str)
   }
 
-  holds (s, p, o, g) {
+  /**
+   * Gets whether this formula holds the specified statement
+   * @param s A subject
+   * @param p A predicate
+   * @param o An object
+   * @param g A containing graph
+   */
+  holds(
+    s?: Node | null,
+    p?: Node | null,
+    o?: Node | null,
+    g?: Node | null
+  ): boolean {
     var i
     if (arguments.length === 1) {
       if (!s) {
@@ -475,26 +642,48 @@ export default class Formula extends Node {
     var st = this.anyStatementMatching(s, p, o, g)
     return st != null
   }
-  holdsStatement (st) {
+
+  /**
+   * Gets whether this formula holds the specified statement
+   * @param st A statement
+   */
+  holdsStatement(st: Statement): boolean {
     return this.holds(st.subject, st.predicate, st.object, st.why)
   }
-  list (values) {
+
+  /**
+   * Gets a collection from a list of values
+   * @param values The values
+   */
+  list(values: Iterable<ValueType>): Collection {
     let collection = new Collection()
     values.forEach(function (val) {
       collection.append(val)
     })
     return collection
   }
-  literal (val, lang, dt) {
+
+  /**
+   * Gets a literal node
+   * @param val The literal's lexical value
+   * @param lang The language
+   * @param dt The datatype as a named node
+   */
+  literal(val: string, lang: string, dt: NamedNode): Literal {
     return new Literal('' + val, lang, dt)
   }
+
   /**
-   * transform a collection of NTriple URIs into their URI strings
+   * Transform a collection of NTriple URIs into their URI strings
    * @param t some iterable colletion of NTriple URI strings
    * @return a collection of the URIs as strings
    * todo: explain why it is important to go through NT
    */
-  NTtoURI (t) {
+  NTtoURI(t: {
+    [uri: string]: any;
+  }): {
+    [uri: string]: any;
+  }{
     var k, v
     var uris = {}
     for (k in t) {
@@ -506,7 +695,14 @@ export default class Formula extends Node {
     }
     return uris
   }
-  serialize (base, contentType, provenance) {
+
+  /**
+   * Serializes this formula
+   * @param base The base string
+   * @param contentType The content type of the syntax to use
+   * @param provenance The provenance URI
+   */
+  serialize(base: string, contentType: string, provenance: string): string {
     var documentString
     var sts
     var sz
@@ -533,7 +729,12 @@ export default class Formula extends Node {
     }
     return documentString
   }
-  substitute (bindings) {
+
+  /**
+   * Gets a new formula with the substituting bindings applied
+   * @param bindings The bindings to substitute
+   */
+  substitute(bindings: Bindings): Formula {
     var statementsCopy = this.statements.map(function (ea) {
       return ea.substitute(bindings)
     })
@@ -543,28 +744,55 @@ export default class Formula extends Node {
     console.log('indexed-form subs formula:' + y)
     return y
   }
-  sym (uri, name) {
+
+  /**
+   * Gets an named node for an URI
+   * @param uri The URI
+   */
+  sym(uri: string | NamedNode): NamedNode {
     if (name) {
       throw new Error('This feature (kb.sym with 2 args) is removed. Do not assume prefix mappings.')
     }
     return new NamedNode(uri)
   }
-  the (s, p, o, g) {
+
+  /**
+   * Gets the node matching the specified pattern
+   * @param s The subject
+   * @param p The predicate
+   * @param o The object
+   * @param g The graph that contains the statement
+   */
+  the(
+    s?: Node | null,
+    p?: Node | null,
+    o?: Node | null,
+    g?: Node | null
+  ): Node | void | null {
     var x = this.any(s, p, o, g)
     if (x == null) {
       log.error('No value found for the() {' + s + ' ' + p + ' ' + o + '}.')
     }
     return x
   }
+
   /**
    * RDFS Inference
    * These are hand-written implementations of a backward-chaining reasoner
    * over the RDFS axioms.
-   * @param seeds {Object} a hash of NTs of classes to start with
+   * @param seeds A hash of NTs of classes to start with
    * @param predicate The property to trace though
-   * @param inverse trace inverse direction
+   * @param inverse Trace inverse direction
    */
-  transitiveClosure (seeds, predicate, inverse) {
+  transitiveClosure(
+    seeds: {
+        [uri: string]: boolean;
+    },
+    predicate: Node,
+    inverse: Node
+  ): {
+      [uri: string]: boolean;
+  } {
     var elt, i, len, s, sups, t
     var agenda = {}
     Object.assign(agenda, seeds)  // make a copy
@@ -595,12 +823,18 @@ export default class Formula extends Node {
       delete agenda[t]
     }
   }
+
   /**
    * Finds the types in the list which have no *stored* supertypes
    * We exclude the universal class, owl:Things and rdf:Resource, as it is
    * information-free.
+   * @param types The types
    */
-  topTypeURIs (types) {
+  topTypeURIs(types: {
+    [id: string]: string | NamedNode;
+  }): {
+      [id: string]: string | NamedNode;
+  } {
     var i
     var j
     var k
@@ -634,11 +868,27 @@ export default class Formula extends Node {
     }
     return tops
   }
-  toString () {
+
+  /**
+   * Serializes this formulat to a string
+   */
+  toString(): string {
     return '{' + this.statements.join('\n') + '}'
   }
-  whether (s, p, o, g) {
-    return this.statementsMatching(s, p, o, g, false).length
+  /**
+   * Gets the number of statements in this formulat that matches the specified pattern
+   * @param s The subject
+   * @param p The predicate
+   * @param o The object
+   * @param g The graph that contains the statement
+   */
+  whether(
+    s?: Node | null,
+    p?: Node | null,
+    o?: Node | null,
+    g?: Node | null
+  ): number {
+    return this.statementsMatching(s, p, o, g).length
   }
 }
 Formula.termType = 'Graph'
@@ -647,4 +897,9 @@ Formula.prototype.classOrder = ClassOrder['Graph']
 Formula.prototype.isVar = false
 
 Formula.prototype.ns = Namespace
-Formula.prototype.variable = name => new Variable(name)
+
+/**
+ * Gets a new variable
+ * @param name The variable's name
+ */
+Formula.prototype.variable = (name: string): Variable => new Variable(name)

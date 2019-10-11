@@ -30,7 +30,7 @@ export default class Collection extends Node {
    * Initializes this collection
    * @param initial The initial elements
    */
-  constructor(initial: ReadonlyArray<ValueType>) {
+  constructor(initial?: ReadonlyArray<ValueType>) {
     super()
     this.termType = Collection.termType
     this.id = BlankNode.nextId++
@@ -38,7 +38,7 @@ export default class Collection extends Node {
     this.closed = false
     if (initial && initial.length > 0) {
       initial.forEach(element => {
-        this.elements.push(Node.fromValue(element))
+        this.elements.push(Node.fromValue(element) as Node)
       })
     }
   }
