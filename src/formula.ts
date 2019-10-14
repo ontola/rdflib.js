@@ -16,10 +16,27 @@ import { ValueType, Bindings } from './types'
  * @module formula
 */
 export default class Formula extends Node {
+
+  static termType: 'Graph';
+
   /**
    * The stored statements
    */
-  statements: Statement[];
+  statements: ReadonlyArray<Statement>;
+
+  /**
+   * The additional constraints
+   */
+  constraints: ReadonlyArray<any>;
+
+  /**
+   * The additional constraints
+   */
+  initBindings: {
+    [id: string]: Node;
+  }
+
+  optional: ReadonlyArray<any>
 
   /**
    * Initializes this formula
@@ -48,9 +65,7 @@ export default class Formula extends Node {
    * Gets a namespace for the specified namespace's URI
    * @param nsuri The URI for the namespace
    */
-  ns(nsuri: string): (ln: string) => NamedNode;
-
-  static termType: string;
+  ns (nsuri: string) { return Namespace(nsuri) }
 
   /** Add a statement from its parts
   * @param {Node} subject - the first part of the statemnt
@@ -58,15 +73,15 @@ export default class Formula extends Node {
   * @param {Node} obbject - the third part of the statemnt
   * @param {Node} graph - the last part of the statemnt
   */
-  add (subject: Node, predicate: NamedNode, object: Node, graph: NamedNode) {
-    return this.statements.push(new Statement(subject, predicate, object, graph))
+  add (subject: Node, predicate: NamedNode, object: Node, graph?: NamedNode) {
+    return (this.statements as Statement[]).push(new Statement(subject, predicate, object, graph))
   }
 
   /** Add a statment object
   * @param {Statement} statement - an existing constructed statement to add
   */
   addStatement (st: Statement): number {
-    return this.statements.push(st)
+    return (this.statements as Statement[]).push(st)
   }
 
   /**
@@ -268,7 +283,7 @@ export default class Formula extends Node {
     o?: Node | null,
     g?: Node | null
   ): Node[] {
-    var elt, i, l, m, q
+    var elt: Statement, i, l, m, q
     var len, len1, len2, len3
     var results = []
     var sts = this.statementsMatching(s, p, o, g)
@@ -515,7 +530,8 @@ export default class Formula extends Node {
     return this.NTtoURI(this.findTypesNT(subject))
   }
 
-  /** Trace statements which connect directly, or through bnodes
+  /**
+   * Trace statements which connect directly, or through bnodes
    *
    * @param subject - The node to start looking for statments
    * @param doc - The document to be searched, or null to search all documents
@@ -749,7 +765,7 @@ export default class Formula extends Node {
    * Gets an named node for an URI
    * @param uri The URI
    */
-  sym(uri: string | NamedNode): NamedNode {
+  sym(uri: string | NamedNode, name?: string): NamedNode {
     if (name) {
       throw new Error('This feature (kb.sym with 2 args) is removed. Do not assume prefix mappings.')
     }
@@ -875,6 +891,9 @@ export default class Formula extends Node {
   toString(): string {
     return '{' + this.statements.join('\n') + '}'
   }
+
+  variable (name: string): Variable
+
   /**
    * Gets the number of statements in this formulat that matches the specified pattern
    * @param s The subject

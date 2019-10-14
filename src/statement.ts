@@ -2,23 +2,32 @@ import { Bindings, ValueType } from './types'
 import Literal from './literal'
 import Node from './node-internal'
 import Collection from './collection'
+import { NamedNode } from './index';
+import DefaultGraph from './default-graph';
+import BlankNode from './blank-node';
+import Variable from './variable';
+
+export type SubjectType = NamedNode | Variable | BlankNode
+export type PredicateType = NamedNode | Variable
+export type ObjectType = NamedNode | Literal | Collection | BlankNode | Variable
+export type GraphType = NamedNode | DefaultGraph | Variable
 
 /** A Statement represents an RDF Triple or Quad. */
 export default class Statement {
   /** The subject of the triple.  What the Statement is about. */
-  subject: Node;
+  subject: SubjectType
 
   /** The relationship which is asserted between the subject and object */
-  predicate: Node;
+  predicate: PredicateType
 
   /** The thing or data value which is asserted to be related to the subject */
-  object: Node | Literal | Collection;
+  object: ObjectType
 
   /**
    * The why param is a named node of the document in which the triple when
    *  it is stored on the web.
    */
-  why: Node;
+  why?: GraphType
 
   /**
    * Construct a new Triple Statment
@@ -37,21 +46,21 @@ export default class Statement {
    *   powerful update() which can update more than one docment.
   */
   constructor (
-    subject: Node,
-    predicate: Node,
-    object: Node | ValueType,
-    why,
+    subject: SubjectType,
+    predicate: PredicateType,
+    object: ObjectType,
+    why?: GraphType,
   ) {
-    this.subject = Node.fromValue(subject) as Node
-    this.predicate = Node.fromValue(predicate) as Node
-    this.object = Node.fromValue(object) as Node
-    this.why = why  // property currently used by rdflib
+    this.subject = Node.fromValue(subject) as SubjectType
+    this.predicate = Node.fromValue(predicate) as PredicateType
+    this.object = Node.fromValue(object) as ObjectType
+    this.why = why as GraphType  // property currently used by rdflib
   }
 
   /**
    * The graph param is a named node of the document in which the triple is stored on the web.
    */
-  get graph (): Node {
+  get graph (): GraphType {
     return this.why
   }
 

@@ -8,6 +8,9 @@ import sparqlUpdateParser from './patch-parser'
 import * as Util from './util'
 import Formula from './formula';
 
+/**
+ * Set of handled MIME types
+ */
 export type mimeTypes =
   'application/ld+json' |
   'application/n-quads' |
@@ -78,6 +81,7 @@ export default function parse (
       throw new Error("Don't know how to parse " + contentType + ' yet')
     }
   } catch (e) {
+    throw e
     executeErrorCallback(e)
   }
 
