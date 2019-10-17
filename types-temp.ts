@@ -19,29 +19,6 @@ import { NamedNode } from './src';
 // Acknowledgements: This work has been financed by Logilab SA, FRANCE, logilab.fr
 
 /**
-* Variables are placeholders used in patterns to be matched.
-* In cwm they are symbols which are the formula's list of quantified variables.
-* In sparql they are not visibly URIs.  Here we compromise, by having
-* a common special base URI for variables. Their names are uris,
-* but the ? notation has an implicit base uri of 'varid:'
-*/
-export interface Variable extends Node {
-  /**
-   * The base string for a variable's name
-   */
-  base: string;
-  /**
-   * The unique identifier of this variable
-   */
-  uri: string;
-  /**
-   * Initializes this variable
-   * @param name The variable's name
-   */
-  constructor(name?: string);
-  static termType: string;
-}
-/**
 * The RDF default graph
 */
 export interface DefaultGraph extends Node {
