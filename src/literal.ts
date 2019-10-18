@@ -24,7 +24,7 @@ export default class Literal extends Node implements RDFJSLiteral {
   /**
    * The literal's datatype as a named node
    */
-  datatype: RDFJSNamedNode
+  datatype: NamedNode
 
   /**
    * Initializes this literal
@@ -32,7 +32,7 @@ export default class Literal extends Node implements RDFJSLiteral {
    * @param language The language for the literal. Defaults to ''.
    * @param datatype The literal's datatype as a named node. Defaults to xsd:string.
    */
-  constructor (value: string, language?: string | null, datatype?: NamedNode) {
+  constructor (value: string, language?: string | null, datatype?: RDFJSNamedNode) {
     super()
     this.termType = TermType.Literal
     this.value = value
@@ -48,7 +48,7 @@ export default class Literal extends Node implements RDFJSLiteral {
       if (isNamedNode(datatype)) {
         this.datatype = datatype
       }
-      this.datatype = NamedNode.fromValue(datatype)
+      this.datatype = NamedNode.fromValue(datatype) as NamedNode
     }
   }
 
@@ -70,9 +70,9 @@ export default class Literal extends Node implements RDFJSLiteral {
 
     return (this.termType === other.termType) &&
       (this.value === other.value) &&
-      (this.language === other.language) &&
-      ((!this.datatype && !other.datatype) ||
-        (this.datatype && this.datatype.equals(other.datatype)))
+      (this.language === (other as Literal).language) &&
+      ((!this.datatype && !(other as Literal).datatype) ||
+        (this.datatype && this.datatype.equals((other as Literal).datatype)))
   }
   /**
    * The language for the literal
