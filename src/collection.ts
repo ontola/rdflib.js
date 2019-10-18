@@ -1,14 +1,18 @@
 import BlankNode from './blank-node'
 import ClassOrder from './class-order'
 import Node from './node-internal'
-import { ValueType, Bindings } from './types';
+import { ValueType, Bindings, Term, CollectionTermType, TermType } from './types';
+
+export function isCollection<T>(value: T | Term): value is Collection {
+  return (value as Node).termType === 'Collection'
+}
 
 /**
 * A collection of other RDF nodes
 */
 export default class Collection extends Node {
 
-  static termType: 'Collection';
+  static termType: CollectionTermType;
 
   /**
    * The identifier for this collection
@@ -96,7 +100,7 @@ export default class Collection extends Node {
     return this.elements.unshift(element)
   }
 }
-Collection.termType = 'Collection'
+Collection.termType = TermType.Collection
 Collection.prototype.classOrder = ClassOrder['Collection']
 Collection.prototype.compareTerm = BlankNode.prototype.compareTerm
 Collection.prototype.isVar = false

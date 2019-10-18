@@ -1,47 +1,54 @@
-import NamedNode from './named-node'
+import NamedNode, { isNamedNode } from './named-node'
 import Node from './node-internal'
 import XSD from './xsd'
-import { ValueType } from './types'
+import { ValueType, Term, LiteralTermType, RDFJSLiteral, RDFJSNamedNode, TermType } from './types'
 import classOrder from './class-order'
+
+export function isLiteral<T>(value: T | Term): value is RDFJSLiteral {
+  return (value as Term).termType === TermType.Literal
+}
 
 /**
  * An RDF literal node, containing something different than a URI.
  * @link https://rdf.js.org/data-model-spec/#literal-interface
  */
-export default class Literal extends Node {
+export default class Literal extends Node implements RDFJSLiteral {
 
-  termType: 'Literal'
+  termType: LiteralTermType
 
   /**
    * The language for the literal
    */
-  lang!: string
+  lang: string
 
   /**
    * The literal's datatype as a named node
    */
-  datatype!: NamedNode
+  datatype: RDFJSNamedNode
 
   /**
    * Initializes this literal
    * @param value The literal's lexical value
-   * @param language The language for the literal
-   * @param datatype The literal's datatype as a named node
+   * @param language The language for the literal. Defaults to ''.
+   * @param datatype The literal's datatype as a named node. Defaults to xsd:string.
    */
   constructor (value: string, language?: string | null, datatype?: NamedNode) {
     super()
-    this.termType = 'Literal'
+    this.termType = TermType.Literal
     this.value = value
     if (language) {
       this.lang = language
       this.datatype = XSD.langString
+    } else {
+      this.lang = ''
+      this.datatype = XSD.string
     }
     // If not specified, a literal has the implied XSD.string default datatype
     if (datatype) {
+      if (isNamedNode(datatype)) {
+        this.datatype = datatype
+      }
       this.datatype = NamedNode.fromValue(datatype)
-    }
-    if (!datatype && !this.datatype) {
-      this.datatype = XSD.string
     }
   }
 
@@ -56,10 +63,11 @@ export default class Literal extends Node {
    * Gets whether two literals are the same
    * @param other The other statement
    */
-  equals (other: Literal): boolean {
+  equals (other: Term): boolean {
     if (!other) {
       return false
     }
+
     return (this.termType === other.termType) &&
       (this.value === other.value) &&
       (this.language === other.language) &&
@@ -148,10 +156,7 @@ export default class Literal extends Node {
    * Builds a literal node from an input value
    * @param value The input value
    */
-  static fromValue(value: ValueType): Literal | Node | undefined | null {
-    if (typeof value === 'undefined' || value === null) {
-      return value
-    }
+  static fromValue(value: ValueType): Literal | Node {
     if (Object.prototype.hasOwnProperty.call(value, 'termType')) {  // this is a Node instance
       return value as Node
     }
@@ -169,7 +174,6 @@ export default class Literal extends Node {
     }
     throw new Error("Can't make literal from " + value + ' of type ' +
       typeof value)
-
   }
 }
 

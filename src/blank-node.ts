@@ -1,6 +1,7 @@
 import ClassOrder from './class-order'
 import Node from './node-internal'
 import { IndexedFormula } from './index';
+import { TermType, BlankNodeTermType } from './types';
 
 /**
  * An RDF blank node is a Node without a URI
@@ -8,7 +9,7 @@ import { IndexedFormula } from './index';
  */
 export default class BlankNode extends Node {
 
-  static termType: 'BlankNode';
+  static termType: BlankNodeTermType;
 
   /**
    * The identifier for the blank node
@@ -90,7 +91,7 @@ export default class BlankNode extends Node {
 }
 
 BlankNode.nextId = 0
-BlankNode.termType = 'BlankNode'
+BlankNode.termType = TermType.BlankNode
 BlankNode.NTAnonymousNodePrefix = '_:'
 BlankNode.prototype.classOrder = ClassOrder['BlankNode']
 BlankNode.prototype.isBlank = true

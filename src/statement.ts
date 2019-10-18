@@ -1,33 +1,28 @@
-import { Bindings, ValueType } from './types'
+import { Bindings, SubjectType, PredicateType, ObjectType, GraphType, RDFJSQuad } from './types'
 import Literal from './literal'
 import Node from './node-internal'
-import Collection from './collection'
-import { NamedNode } from './index';
-import DefaultGraph from './default-graph';
+import { NamedNode, Collection } from './index';
 import BlankNode from './blank-node';
 import Variable from './variable';
 
-export type SubjectType = NamedNode | Variable | BlankNode
-export type PredicateType = NamedNode | Variable
-export type ObjectType = NamedNode | Literal | Collection | BlankNode | Variable
-export type GraphType = NamedNode | DefaultGraph | Variable
+type StObjectType = NamedNode | Literal | Collection | BlankNode | Variable
 
 /** A Statement represents an RDF Triple or Quad. */
-export default class Statement {
+export default class Statement implements RDFJSQuad<Node, NamedNode, StObjectType, NamedNode> {
   /** The subject of the triple.  What the Statement is about. */
-  subject: SubjectType
+  subject: Node
 
   /** The relationship which is asserted between the subject and object */
-  predicate: PredicateType
+  predicate: NamedNode
 
   /** The thing or data value which is asserted to be related to the subject */
-  object: ObjectType
+  object: StObjectType
 
   /**
    * The why param is a named node of the document in which the triple when
    *  it is stored on the web.
    */
-  why?: GraphType
+  why: GraphType
 
   /**
    * Construct a new Triple Statment
@@ -51,9 +46,9 @@ export default class Statement {
     object: ObjectType,
     why?: GraphType,
   ) {
-    this.subject = Node.fromValue(subject) as SubjectType
-    this.predicate = Node.fromValue(predicate) as PredicateType
-    this.object = Node.fromValue(object) as ObjectType
+    this.subject = Node.fromValue(subject) as Node
+    this.predicate = Node.fromValue(predicate) as NamedNode
+    this.object = Node.fromValue(object) as StObjectType
     this.why = why as GraphType  // property currently used by rdflib
   }
 
@@ -72,7 +67,7 @@ export default class Statement {
    * Gets whether two statements are the same
    * @param other The other statement
    */
-  equals (other: Statement): boolean {
+  equals (other: RDFJSQuad): boolean {
     return (
       other.subject.equals(this.subject) &&
       other.predicate.equals(this.predicate) &&
@@ -89,7 +84,7 @@ export default class Statement {
     const y = new Statement(
       this.subject.substitute(bindings),
       this.predicate.substitute(bindings),
-      this.object.substitute(bindings) as Node,
+      this.object.substitute(bindings) as NamedNode,
       this.why.substitute(bindings)) // 2016
     console.log('@@@ statement substitute:' + y)
     return y

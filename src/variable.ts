@@ -12,7 +12,7 @@ import { TermType } from './types'
 */
 export default class Variable extends Node {
   termType: TermType.Variable
-  static termType: TermType.Variable = TermType.Variable
+  static termType: TermType.Variable
 
   /**
    * The base string for a variable's name
@@ -54,6 +54,6 @@ export default class Variable extends Node {
   }
 }
 
-Variable.termType = "Variable"
+Variable.termType = TermType.Variable
 Variable.prototype.classOrder = ClassOrder['Variable']
 Variable.prototype.isVar = true

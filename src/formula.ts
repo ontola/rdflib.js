@@ -8,8 +8,16 @@ import Namespace from './namespace'
 import Node from './node-internal'
 import Serializer from './serialize'
 import Statement from './statement'
+import {
+  Bindings,
+  GraphType,
+  ObjectType,
+  PredicateType,
+  SubjectType,
+  Term,
+  ValueType,
+} from './types'
 import Variable from './variable'
-import { ValueType, Bindings } from './types'
 
 /**
  * A formula, or store of RDF statements
@@ -73,7 +81,12 @@ export default class Formula extends Node {
   * @param {Node} obbject - the third part of the statemnt
   * @param {Node} graph - the last part of the statemnt
   */
-  add (subject: Node, predicate: NamedNode, object: Node, graph?: NamedNode) {
+  add (
+    subject: SubjectType,
+    predicate: PredicateType,
+    object: ObjectType,
+    graph?: GraphType
+  ) {
     return (this.statements as Statement[]).push(new Statement(subject, predicate, object, graph))
   }
 
@@ -196,7 +209,6 @@ export default class Formula extends Node {
    * @param predicate - A node to search for as predicate, or if null, a wildcard
    * @param object - A node to search for as object, or if null, a wildcard
    * @param graph - A node to search for as graph, or if null, a wildcard
-   * @param justOne - flag - stop when found one rather than get all of them?
    * @returns {Array<Node>} - An array of nodes which match the wildcard position
    */
   statementsMatching(
@@ -204,13 +216,12 @@ export default class Formula extends Node {
     pred?: Node | null,
     obj?: Node | null,
     why?: Node | null,
-    justOne?: boolean
     ): Statement[] {
     let found = this.statements.filter(st =>
-      (!subj || subj.sameTerm(st.subject)) &&
-      (!pred || pred.sameTerm(st.predicate)) &&
-      (!obj || obj.sameTerm(st.object)) &&
-      (!why || why.sameTerm(st.subject))
+      (!subj || subj.equals(st.subject)) &&
+      (!pred || pred.equals(st.predicate)) &&
+      (!obj || obj.equals(st.object)) &&
+      (!why || why.equals(st.subject))
      )
     return found
   }
@@ -278,11 +289,11 @@ export default class Formula extends Node {
   * @returns - An array of nodes which match the wildcard position
   */
   each(
-    s?: Node | null,
-    p?: Node | null,
-    o?: Node | null,
-    g?: Node | null
-  ): Node[] {
+    s?: Term | null,
+    p?: Term | null,
+    o?: Term | null,
+    g?: Term | null
+  ): Term[] {
     var elt: Statement, i, l, m, q
     var len, len1, len2, len3
     var results = []
@@ -407,7 +418,7 @@ export default class Formula extends Node {
    * @param subject A named node
    */
   findMemberURIs(
-    subject: Node
+    subject: Term
   ): {
       [uri: string]: Statement;
   } {
@@ -423,7 +434,7 @@ export default class Formula extends Node {
    * @param subject A subject node
    */
   findSubClassesNT(
-    subject: Node
+    subject: Term
   ): {
       [uri: string]: boolean;
   } {
@@ -892,6 +903,10 @@ export default class Formula extends Node {
     return '{' + this.statements.join('\n') + '}'
   }
 
+  /**
+   * Gets a new variable
+   * @param name The variable's name
+   */
   variable (name: string): Variable
 
   /**

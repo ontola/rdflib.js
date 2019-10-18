@@ -1,13 +1,18 @@
 import ClassOrder from './class-order'
 import Node from './node-internal'
-import { ValueType } from './types';
+import { ValueType, RDFJSNamedNode, TermType, NamedNodeTermType } from './types';
+
+export function isNamedNode<T>(value: T | Node): value is NamedNode {
+  return (value as Node).termType === TermType.NamedNode
+}
 
 /**
 * A named (IRI) RDF node
 */
-export default class NamedNode extends Node {
+export default class NamedNode extends Node implements RDFJSNamedNode {
+  static termType: NamedNodeTermType;
 
-  static termType: 'NamedNode';
+  termType: NamedNodeTermType;
 
   /**
    * Initializes this node
@@ -15,7 +20,7 @@ export default class NamedNode extends Node {
    */
   constructor (iri: NamedNode | string) {
     super()
-    this.termType = NamedNode.termType
+    this.termType = TermType.NamedNode
 
     if (iri && (iri as NamedNode).termType === NamedNode.termType) {  // param is a named node
       iri = (iri as NamedNode).value
@@ -116,6 +121,6 @@ export default class NamedNode extends Node {
     return new NamedNode(value as string)
   }
 }
-NamedNode.termType = 'NamedNode'
+NamedNode.termType = TermType.NamedNode
 NamedNode.prototype.classOrder = ClassOrder['NamedNode']
 NamedNode.prototype.isVar = false

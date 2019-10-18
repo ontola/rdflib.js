@@ -3,10 +3,16 @@
 import Node from './node-internal'
 import Collection from './collection'
 import Literal from './literal'
-import { ValueType } from './types'
+import { ValueType, Term } from './types'
 import Namespace from './namespace'
+import { isCollection } from './collection';
+import { isLiteral } from './literal';
 
 export default Node
+
+function isNode<T>(value: T | Node): value is Node {
+  return Object.prototype.hasOwnProperty.call(value, 'termType')
+}
 
 /**
  * Creates an RDF Node from a native javascript value.
@@ -14,13 +20,13 @@ export default Node
  * @method fromValue
  * @param value - Any native Javascript value
  */
-Node.fromValue = function (value: ValueType): Node | Literal | undefined | null | Collection {
+Node.fromValue = function (value: ValueType): Node | undefined | null {
   if (typeof value === 'undefined' || value === null) {
+    // throw new Error(`Can't make Node from ${typeof value}`)
     return value
   }
-  const isNode = Object.prototype.hasOwnProperty.call(value, 'termType')
-  if (isNode) {  // a Node subclass or a Collection
-    return value
+  if (isNode(value)) {  // a Node subclass or a Collection
+    return (value)
   }
   if (Array.isArray(value)) {
     return new Collection(value)
@@ -34,28 +40,25 @@ const ns = { xsd: Namespace('http://www.w3.org/2001/XMLSchema#') }
  * Gets the javascript object equivalent to a node
  * @param term The RDF node
  */
-Node.toJS = function (term: Node | Literal) {
-  if (term.elements) {
+Node.toJS = function (term: Term) {
+  if (isCollection(term)) {
     return term.elements.map(Node.toJS) // Array node (not standard RDFJS)
   }
-  // Node remains Node
-  if (!term.datatype) return term // Objects remain objects
-  const literalTerm = term as Literal
-  // if (!Object.prototype.hasOwnProperty.call(term, 'dataType')) return term // Objects remain objects
-  if (literalTerm.datatype.sameTerm(ns.xsd('boolean'))) {
-    return literalTerm.value === '1'
+  if (!isLiteral(term)) return term
+  if (term.datatype.equals(ns.xsd('boolean'))) {
+    return term.value === '1'
   }
-  if (literalTerm.datatype.sameTerm(ns.xsd('dateTime')) ||
-    literalTerm.datatype.sameTerm(ns.xsd('date'))) {
-    return new Date(literalTerm.value)
+  if (term.datatype.equals(ns.xsd('dateTime')) ||
+    term.datatype.equals(ns.xsd('date'))) {
+    return new Date(term.value)
   }
   if (
-    literalTerm.datatype.sameTerm(ns.xsd('integer')) ||
-    literalTerm.datatype.sameTerm(ns.xsd('float')) ||
-    literalTerm.datatype.sameTerm(ns.xsd('decimal'))
+    term.datatype.equals(ns.xsd('integer')) ||
+    term.datatype.equals(ns.xsd('float')) ||
+    term.datatype.equals(ns.xsd('decimal'))
   ) {
-    let z = Number(literalTerm.value)
-    return Number(literalTerm.value)
+    let z = Number(term.value)
+    return Number(term.value)
   }
-  return literalTerm.value
+  return term.value
 }

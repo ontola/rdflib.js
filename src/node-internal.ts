@@ -1,10 +1,11 @@
-import { ValueType, Bindings } from './types'
+import { ValueType, Bindings, Term } from './types'
 import Collection from './collection'
 import Literal from './literal'
 
 /**
  * The superclass of all RDF Statement objects, that is
  * NamedNode, Literal, BlankNode, etc.
+ * Should not be instantiated directly.
  * Also called Term.
  * @link https://rdf.js.org/data-model-spec/#term-interface
  * @class Node
@@ -36,7 +37,7 @@ export default abstract class Node {
   value!: string;
 
   // Specified in './node.ts' to prevent circulur dependency
-  static fromValue: (value: ValueType | null) => Node | Literal | undefined | null | Collection
+  static fromValue: (value: ValueType | null) => Node | undefined | null
 
   // Specified in './node.ts' to prevent circulur dependency
   static toJS: (term: Node | Literal) => any
@@ -74,7 +75,7 @@ export default abstract class Node {
    * Gets whether the two nodes are equal
    * @param other The other node
    */
-  equals (other: Node): boolean {
+  equals (other: Term): boolean {
     if (!other) {
       return false
     }
