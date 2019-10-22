@@ -1,6 +1,6 @@
 import ClassOrder from './class-order'
 import Node from './node-internal'
-import { ValueType, RDFJSNamedNode, TermType, NamedNodeTermType } from './types';
+import { ValueType, TFNamedNode, TermType, NamedNodeTermType } from './types';
 
 export function isNamedNode<T>(value: T | Node): value is NamedNode {
   return (value as Node).termType === TermType.NamedNode
@@ -9,7 +9,7 @@ export function isNamedNode<T>(value: T | Node): value is NamedNode {
 /**
 * A named (IRI) RDF node
 */
-export default class NamedNode extends Node implements RDFJSNamedNode {
+export default class NamedNode extends Node implements TFNamedNode {
   static termType: NamedNodeTermType;
 
   termType: NamedNodeTermType;

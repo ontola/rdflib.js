@@ -7,6 +7,7 @@ import RDFParser from './rdfxmlparser'
 import sparqlUpdateParser from './patch-parser'
 import * as Util from './util'
 import Formula from './formula';
+import { TFQuad } from './types';
 
 /**
  * Set of handled MIME types
@@ -37,8 +38,8 @@ export default function parse (
   str: string,
   kb: Formula,
   base: string,
-  contentType: string,
-  callback: (error: any, kb: Formula) => void
+  contentType?: string,
+  callback: (error: any, kb: Formula | null) => void
 ) {
   contentType = contentType || 'text/turtle'
   contentType = contentType.split(';')[0]
@@ -72,7 +73,7 @@ export default function parse (
           return callback(parseErr, null)
         }
         jsonld.toRDF(jsonDocument,
-          {format: 'application/nquads', base},
+          {format: 'application/n-quads', base},
           nquadCallback)
       } else {
         nquadCallback(null, str)
@@ -81,11 +82,10 @@ export default function parse (
       throw new Error("Don't know how to parse " + contentType + ' yet')
     }
   } catch (e) {
-    throw e
     executeErrorCallback(e)
   }
 
-  parse.handled = {
+  (parse as any).handled= {
     'text/n3': true,
     'text/turtle': true,
     'application/rdf+xml': true,
@@ -105,16 +105,18 @@ export default function parse (
     }
   }
 
-  function executeErrorCallback (e) {
-    if (contentType !== 'application/ld+json' ||
+  function executeErrorCallback (e: Error): void {
+    if (
+      contentType !== 'application/ld+json' ||
       contentType !== 'application/nquads' ||
-      contentType !== 'application/n-quads') {
+      contentType !== 'application/n-quads'
+    ) {
       if (callback) {
         callback(e, kb)
       } else {
         let e2 = new Error('' + e + ' while trying to parse <' + base + '> as ' + contentType)
         e2.cause = e
-        throw e2
+        throw e2.
       }
     }
   }
@@ -140,9 +142,9 @@ export default function parse (
     }
   }
 
-  function tripleCallback (err, triple, prefixes) {
+  function tripleCallback (err: Error, triple: TFQuad) {
     if (triple) {
-      kb.add(triple)
+      kb.add(triple.subject, triple.predicate, triple.object, triple.graph)
     } else {
       callback(err, kb)
     }

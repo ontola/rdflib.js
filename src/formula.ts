@@ -9,15 +9,18 @@ import Node from './node-internal'
 import Serializer from './serialize'
 import Statement from './statement'
 import {
-  Bindings,
   GraphType,
   ObjectType,
   PredicateType,
   SubjectType,
-  Term,
+  TFTerm,
   ValueType,
 } from './types'
 import Variable from './variable'
+
+export function isFormula<T>(value: T | TFTerm): value is Formula {
+  return (value as Node).termType === 'Graph'
+}
 
 /**
  * A formula, or store of RDF statements
@@ -42,7 +45,7 @@ export default class Formula extends Node {
    */
   initBindings: {
     [id: string]: Node;
-  }
+  } | []
 
   optional: ReadonlyArray<any>
 
@@ -54,12 +57,12 @@ export default class Formula extends Node {
    * @param optional
    */
   constructor(
-    statements: ReadonlyArray<Statement>,
-    constraints: ReadonlyArray<any>,
-    initBindings: {
+    statements?: ReadonlyArray<Statement>,
+    constraints?: ReadonlyArray<any>,
+    initBindings?: {
         [id: string]: Node;
     },
-    optional: ReadonlyArray<any>
+    optional?: ReadonlyArray<any>
   ){
     super()
     this.termType = Formula.termType
@@ -76,10 +79,10 @@ export default class Formula extends Node {
   ns (nsuri: string) { return Namespace(nsuri) }
 
   /** Add a statement from its parts
-  * @param {Node} subject - the first part of the statemnt
-  * @param {Node} predicate - the second part of the statemnt
-  * @param {Node} obbject - the third part of the statemnt
-  * @param {Node} graph - the last part of the statemnt
+  * @param subject - the first part of the statemnt
+  * @param predicate - the second part of the statemnt
+  * @param obbject - the third part of the statemnt
+  * @param graph - the last part of the statemnt
   */
   add (
     subject: SubjectType,
@@ -128,10 +131,10 @@ export default class Formula extends Node {
   * @returns {Node} - A node which match the wildcard position, or null
   */
   any(
-    s?: Node | null,
-    p?: Node | null,
-    o?: Node | null,
-    g?: Node | null
+    s?: TFTerm | null,
+    p?: TFTerm | null,
+    o?: TFTerm | null,
+    g?: TFTerm | null
   ): Node | null | void {
     var st = this.anyStatementMatching(s, p, o, g)
     if (st == null) {
@@ -154,10 +157,10 @@ export default class Formula extends Node {
    * @param g The graph that contains the statement
    */
   anyValue(
-    s?: Node | null,
-    p?: Node | null,
-    o?: Node | null,
-    g?: Node | null
+    s?: TFTerm | null,
+    p?: TFTerm | null,
+    o?: TFTerm | null,
+    g?: TFTerm | null
   ): string | void {
     var y = this.any(s, p, o, g)
     return y ? y.value : void 0
@@ -172,10 +175,10 @@ export default class Formula extends Node {
    * @param g The graph that contains the statement
    */
   anyJS(
-    s?: Node | null,
-    p?: Node | null,
-    o?: Node | null,
-    g?: Node | null
+    s?: TFTerm | null,
+    p?: TFTerm | null,
+    o?: TFTerm | null,
+    g?: TFTerm | null
   ): any {
     var y = this.any(s, p, o, g)
     return y ? Node.toJS(y) : void 0
@@ -189,12 +192,12 @@ export default class Formula extends Node {
    * @param why The graph that contains the statement
    */
   anyStatementMatching(
-    subj?: Node | null,
-    pred?: Node | null,
-    obj?: Node | null,
-    why?: Node | null
+    subj?: TFTerm | null,
+    pred?: TFTerm | null,
+    obj?: TFTerm | null,
+    why?: TFTerm | null
   ): Statement | undefined {
-    var x = this.statementsMatching(subj, pred, obj, why, true)
+    var x = this.statementsMatching(subj, pred, obj, why)
     if (!x || x.length === 0) {
       return undefined
     }
@@ -212,10 +215,10 @@ export default class Formula extends Node {
    * @returns {Array<Node>} - An array of nodes which match the wildcard position
    */
   statementsMatching(
-    subj?: Node | null,
-    pred?: Node | null,
-    obj?: Node | null,
-    why?: Node | null,
+    subj?: TFTerm | null,
+    pred?: TFTerm | null,
+    obj?: TFTerm | null,
+    why?: TFTerm | null,
     ): Statement[] {
     let found = this.statements.filter(st =>
       (!subj || subj.equals(st.subject)) &&
@@ -289,14 +292,14 @@ export default class Formula extends Node {
   * @returns - An array of nodes which match the wildcard position
   */
   each(
-    s?: Term | null,
-    p?: Term | null,
-    o?: Term | null,
-    g?: Term | null
-  ): Term[] {
-    var elt: Statement, i, l, m, q
-    var len, len1, len2, len3
-    var results = []
+    s?: TFTerm | null,
+    p?: TFTerm | null,
+    o?: TFTerm | null,
+    g?: TFTerm | null
+  ): TFTerm[] {
+    var elt: Statement, i: number, l: number, m: number, q: number
+    var len: number, len1: number, len2: number, len3: number
+    var results: TFTerm[] = []
     var sts = this.statementsMatching(s, p, o, g)
     if (s == null) {
       for (i = 0, len = sts.length; i < len; i++) {
@@ -348,27 +351,27 @@ export default class Formula extends Node {
   ): {
       [uri: string]: Statement;
   } {
-    var i
-    var l
-    var len
-    var len1
-    var len2
-    var len3
-    var len4
-    var m
+    var i: number
+    var l: number
+    var len: number
+    var len1: number
+    var len2: number
+    var len3: number
+    var len4: number
+    var m: number
     var members
     var pred
-    var q
+    var q: number
     var ref
-    var ref1
-    var ref2
-    var ref3
-    var ref4
-    var ref5
+    var ref1: Statement[]
+    var ref2: TFTerm[]
+    var ref3: Statement[]
+    var ref4: TFTerm[]
+    var ref5: Statement[]
     var seeds
     var st
     var t
-    var u
+    var u: number
     seeds = {}
     seeds[thisClass.toNT()] = true
     members = {}
@@ -418,7 +421,7 @@ export default class Formula extends Node {
    * @param subject A named node
    */
   findMemberURIs(
-    subject: Term
+    subject: TF
   ): {
       [uri: string]: Statement;
   } {
@@ -434,7 +437,7 @@ export default class Formula extends Node {
    * @param subject A subject node
    */
   findSubClassesNT(
-    subject: Term
+    subject: Node
   ): {
       [uri: string]: boolean;
   } {
@@ -462,7 +465,7 @@ export default class Formula extends Node {
     var types = {}
     types[subject.toNT()] = true
     return this.transitiveClosure(types,
-      this.sym('http://www.w3.org/2000/01/rdf-schema#subClassOf'), false)
+      this.sym('http://www.w3.org/2000/01/rdf-schema#subClassOf'))
   }
 
   /**
@@ -479,22 +482,22 @@ export default class Formula extends Node {
   ): {
       [uri: string]: boolean;
   } {
-    var domain
-    var i
-    var l
-    var len
-    var len1
-    var len2
-    var len3
-    var m
-    var q
-    var range
-    var rdftype
-    var ref
-    var ref1
-    var ref2
-    var ref3
-    var st
+    var domain: TFTerm
+    var i: number
+    var l: number
+    var len: number
+    var len1: number
+    var len2: number
+    var len3: number
+    var m: number
+    var q: number
+    var range: TFTerm
+    var rdftype: string
+    var ref: Statement[]
+    var ref1: TFTerm[]
+    var ref2: Statement[]
+    var ref3: TFTerm[]
+    var st: Statement
     var types
     rdftype = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
     types = []
@@ -507,7 +510,7 @@ export default class Formula extends Node {
         ref1 = this.each(st.predicate, this.sym('http://www.w3.org/2000/01/rdf-schema#domain'))
         for (l = 0, len1 = ref1.length; l < len1; l++) {
           range = ref1[l]
-          types[range.toNT()] = st
+          types[(range as Node).toNT()] = st
         }
       }
     }
@@ -517,7 +520,7 @@ export default class Formula extends Node {
       ref3 = this.each(st.predicate, this.sym('http://www.w3.org/2000/01/rdf-schema#range'))
       for (q = 0, len3 = ref3.length; q < len3; q++) {
         domain = ref3[q]
-        types[domain.toNT()] = st
+        types[(domain as Node).toNT()] = st
       }
     }
     return this.transitiveClosure(types, this.sym('http://www.w3.org/2000/01/rdf-schema#subClassOf'), false)
@@ -550,14 +553,14 @@ export default class Formula extends Node {
    */
   connectedStatements(
     subject: Node,
-    doc: ValueType,
+    doc: GraphType,
     excludePredicateURIs: ReadonlyArray<string>
   ): Statement[] {
     excludePredicateURIs = excludePredicateURIs || []
-    var todo = [subject]
-    var done = []
+    var todo: Node[] = [subject]
+    var done: any[] = []
     var doneArcs = []
-    var result = []
+    var result: Statement[] = []
     var self = this
     var follow = function (x) {
       var queue = function (x) {
@@ -576,7 +579,7 @@ export default class Formula extends Node {
         return true
       }
       )
-      sts.forEach(function (st, i) {
+      sts.forEach(function (st) {
         queue(st.subject)
         queue(st.object)
       })
@@ -585,7 +588,6 @@ export default class Formula extends Node {
     while (todo.length) {
       follow(todo.shift())
     }
-    // console.log('' + result.length + ' statements about ' + subject)
     return result
   }
 
@@ -642,10 +644,10 @@ export default class Formula extends Node {
    * @param g A containing graph
    */
   holds(
-    s?: Node | null,
-    p?: Node | null,
-    o?: Node | null,
-    g?: Node | null
+    s?: TFTerm | Formula | null,
+    p?: TFTerm | null,
+    o?: TFTerm | null,
+    g?: TFTerm | null
   ): boolean {
     var i
     if (arguments.length === 1) {
@@ -661,8 +663,6 @@ export default class Formula extends Node {
         return true
       } else if (s instanceof Statement) {
         return this.holds(s.subject, s.predicate, s.object, s.why)
-      } else if (s.statements) {
-        return this.holds(s.statements)
       }
     }
 
@@ -706,6 +706,7 @@ export default class Formula extends Node {
    * @return a collection of the URIs as strings
    * todo: explain why it is important to go through NT
    */
+
   NTtoURI(t: {
     [uri: string]: any;
   }): {
@@ -776,7 +777,7 @@ export default class Formula extends Node {
    * Gets an named node for an URI
    * @param uri The URI
    */
-  sym(uri: string | NamedNode, name?: string): NamedNode {
+  sym(uri: string | NamedNode, name?: any): NamedNode {
     if (name) {
       throw new Error('This feature (kb.sym with 2 args) is removed. Do not assume prefix mappings.')
     }
@@ -816,7 +817,7 @@ export default class Formula extends Node {
         [uri: string]: boolean;
     },
     predicate: Node,
-    inverse: Node
+    inverse?: boolean
   ): {
       [uri: string]: boolean;
   } {

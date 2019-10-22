@@ -1,5 +1,4 @@
-import { ValueType, Bindings, Term } from './types'
-import Collection from './collection'
+import { ValueType, Bindings, TFTerm } from './types'
 import Literal from './literal'
 
 /**
@@ -37,7 +36,8 @@ export default abstract class Node {
   value!: string;
 
   // Specified in './node.ts' to prevent circulur dependency
-  static fromValue: (value: ValueType | null) => Node | undefined | null
+  // static fromValue: (value: ValueType) =>  TFTerm | Node | Literal | undefined | null
+  static fromValue: <T extends ValueType>(value: ValueType) => T
 
   // Specified in './node.ts' to prevent circulur dependency
   static toJS: (term: Node | Literal) => any
@@ -75,7 +75,7 @@ export default abstract class Node {
    * Gets whether the two nodes are equal
    * @param other The other node
    */
-  equals (other: Term): boolean {
+  equals (other: TFTerm): boolean {
     if (!other) {
       return false
     }

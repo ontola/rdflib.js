@@ -1,14 +1,15 @@
 import ClassOrder from './class-order'
 import Node from './node-internal'
 import { IndexedFormula } from './index';
-import { TermType, BlankNodeTermType } from './types';
+import { TermType, BlankNodeTermType, TFBlankNode } from './types';
 
 /**
  * An RDF blank node is a Node without a URI
  * @link https://rdf.js.org/data-model-spec/#blanknode-interface
  */
-export default class BlankNode extends Node {
+export default class BlankNode extends Node implements TFBlankNode {
 
+  termType: BlankNodeTermType;
   static termType: BlankNodeTermType;
 
   /**

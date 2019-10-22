@@ -1,9 +1,9 @@
 import BlankNode from './blank-node'
 import ClassOrder from './class-order'
 import Node from './node-internal'
-import { ValueType, Bindings, Term, CollectionTermType, TermType } from './types';
+import { ValueType, Bindings, TFTerm, CollectionTermType, TermType } from './types';
 
-export function isCollection<T>(value: T | Term): value is Collection {
+export function isCollection<T>(value: T | TFTerm): value is Collection {
   return (value as Node).termType === 'Collection'
 }
 

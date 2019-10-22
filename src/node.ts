@@ -3,35 +3,38 @@
 import Node from './node-internal'
 import Collection from './collection'
 import Literal from './literal'
-import { ValueType, Term } from './types'
+import { ValueType, TFTerm } from './types'
 import Namespace from './namespace'
 import { isCollection } from './collection';
 import { isLiteral } from './literal';
 
 export default Node
 
-function isNode<T>(value: T | Node): value is Node {
+function isTFTerm<T>(value: T | TFTerm): value is TFTerm {
   return Object.prototype.hasOwnProperty.call(value, 'termType')
 }
 
 /**
  * Creates an RDF Node from a native javascript value.
  * RDF Nodes are returned unchanged, undefined returned as itself.
+ * Arrays return Collections.
+ * Strings, numbers and booleans return Literals.
  * @method fromValue
  * @param value - Any native Javascript value
  */
-Node.fromValue = function (value: ValueType): Node | undefined | null {
+
+Node.fromValue = function <T extends ValueType>(value: ValueType): T {
   if (typeof value === 'undefined' || value === null) {
     // throw new Error(`Can't make Node from ${typeof value}`)
-    return value
+    return value as T
   }
-  if (isNode(value)) {  // a Node subclass or a Collection
-    return (value)
+  if (isTFTerm(value)) {  // a Node subclass or a Collection
+    return value as T
   }
   if (Array.isArray(value)) {
-    return new Collection(value)
+    return new Collection(value) as T
   }
-  return Literal.fromValue(value)
+  return Literal.fromValue(value) as T
 }
 
 const ns = { xsd: Namespace('http://www.w3.org/2001/XMLSchema#') }
@@ -40,7 +43,7 @@ const ns = { xsd: Namespace('http://www.w3.org/2001/XMLSchema#') }
  * Gets the javascript object equivalent to a node
  * @param term The RDF node
  */
-Node.toJS = function (term: Term) {
+Node.toJS = function (term: TFTerm) {
   if (isCollection(term)) {
     return term.elements.map(Node.toJS) // Array node (not standard RDFJS)
   }

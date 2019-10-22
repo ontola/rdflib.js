@@ -1,16 +1,16 @@
-import { Bindings, SubjectType, PredicateType, ObjectType, GraphType, RDFJSQuad } from './types'
+import { Bindings, SubjectType, PredicateType, ObjectType, GraphType, TFQuad, TFNamedNode, SomeNode } from './types'
 import Literal from './literal'
 import Node from './node-internal'
-import { NamedNode, Collection } from './index';
+import { NamedNode, Collection, defaultGraph } from './index';
 import BlankNode from './blank-node';
 import Variable from './variable';
 
 type StObjectType = NamedNode | Literal | Collection | BlankNode | Variable
 
 /** A Statement represents an RDF Triple or Quad. */
-export default class Statement implements RDFJSQuad<Node, NamedNode, StObjectType, NamedNode> {
+export default class Statement implements TFQuad<SomeNode, NamedNode, StObjectType, NamedNode> {
   /** The subject of the triple.  What the Statement is about. */
-  subject: Node
+  subject: SomeNode
 
   /** The relationship which is asserted between the subject and object */
   predicate: NamedNode
@@ -22,7 +22,7 @@ export default class Statement implements RDFJSQuad<Node, NamedNode, StObjectTyp
    * The why param is a named node of the document in which the triple when
    *  it is stored on the web.
    */
-  why: GraphType
+  why: TFNamedNode
 
   /**
    * Construct a new Triple Statment
@@ -46,16 +46,19 @@ export default class Statement implements RDFJSQuad<Node, NamedNode, StObjectTyp
     object: ObjectType,
     why?: GraphType,
   ) {
-    this.subject = Node.fromValue(subject) as Node
-    this.predicate = Node.fromValue(predicate) as NamedNode
-    this.object = Node.fromValue(object) as StObjectType
-    this.why = why as GraphType  // property currently used by rdflib
+    this.subject = Node.fromValue<SomeNode>(subject)
+    this.predicate = Node.fromValue(predicate)
+    this.object = Node.fromValue(object)
+    this.why = why as NamedNode  // property currently used by rdflib
+    if (why == undefined) {
+      this.why = defaultGraph
+    }
   }
 
   /**
    * The graph param is a named node of the document in which the triple is stored on the web.
    */
-  get graph (): GraphType {
+  get graph () {
     return this.why
   }
 
@@ -67,7 +70,7 @@ export default class Statement implements RDFJSQuad<Node, NamedNode, StObjectTyp
    * Gets whether two statements are the same
    * @param other The other statement
    */
-  equals (other: RDFJSQuad): boolean {
+  equals (other: TFQuad): boolean {
     return (
       other.subject.equals(this.subject) &&
       other.predicate.equals(this.predicate) &&

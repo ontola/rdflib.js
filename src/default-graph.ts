@@ -1,7 +1,7 @@
 import Node from './node-internal'
-import { RDFJSDefaultGraph } from './types';
+import { TFDefaultGraph } from './types';
 
-export default class DefaultGraph extends Node implements RDFJSDefaultGraph {
+export default class DefaultGraph extends Node implements TFDefaultGraph {
   value: ''
 
   constructor () {

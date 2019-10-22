@@ -1,18 +1,18 @@
 import NamedNode, { isNamedNode } from './named-node'
 import Node from './node-internal'
 import XSD from './xsd'
-import { ValueType, Term, LiteralTermType, RDFJSLiteral, RDFJSNamedNode, TermType } from './types'
+import { ValueType, TFTerm, LiteralTermType, TFLiteral, TFNamedNode, TermType } from './types'
 import classOrder from './class-order'
 
-export function isLiteral<T>(value: T | Term): value is RDFJSLiteral {
-  return (value as Term).termType === TermType.Literal
+export function isLiteral<T>(value: T | TFTerm): value is TFLiteral {
+  return (value as TFTerm).termType === TermType.Literal
 }
 
 /**
  * An RDF literal node, containing something different than a URI.
  * @link https://rdf.js.org/data-model-spec/#literal-interface
  */
-export default class Literal extends Node implements RDFJSLiteral {
+export default class Literal extends Node implements TFLiteral {
 
   termType: LiteralTermType
 
@@ -32,7 +32,7 @@ export default class Literal extends Node implements RDFJSLiteral {
    * @param language The language for the literal. Defaults to ''.
    * @param datatype The literal's datatype as a named node. Defaults to xsd:string.
    */
-  constructor (value: string, language?: string | null, datatype?: RDFJSNamedNode) {
+  constructor (value: string, language?: string | null, datatype?: TFNamedNode) {
     super()
     this.termType = TermType.Literal
     this.value = value
@@ -63,7 +63,7 @@ export default class Literal extends Node implements RDFJSLiteral {
    * Gets whether two literals are the same
    * @param other The other statement
    */
-  equals (other: Term): boolean {
+  equals (other: TFTerm): boolean {
     if (!other) {
       return false
     }
