@@ -134,6 +134,7 @@ export interface Bindings {
   [id: string]: Node;
 }
 
+export type TFSomeNode = TFBlankNode | TFNamedNode
 export type SubjectType = TFBlankNode | NamedNode | TFNamedNode | Variable
 export type PredicateType = TFNamedNode | NamedNode | Variable
 export type ObjectType = TFObject | NamedNode | Literal | Collection | BlankNode | Variable
@@ -175,21 +176,21 @@ export interface DataFactory {
 
   supports: SupportTable
 
-  namedNode(value: string): NamedNode
+  namedNode(value: string): TFNamedNode
 
-  blankNode(value?: string): BlankNode
+  blankNode(value?: string): TFBlankNode
 
-  literal(value: string, languageOrDatatype?: string | NamedNode): Literal
+  literal(value: string, languageOrDatatype?: string | TFNamedNode): TFLiteral
 
-  literal(value: unknown): Literal
+  literal(value: unknown): TFLiteral
 
-  defaultGraph(): NamedNode
+  defaultGraph(): TFNamedNode
 
   quad(
-    subject: Node,
-    predicate: NamedNode,
+    subject: TFNamedNode | TFBlankNode | TFVariable,
+    predicate: TFNamedNode,
     object: TFTerm,
-    graph?: NamedNode
+    graph?: TFNamedNode
   ): TFQuad
 
   isQuad(obj: any): obj is TFQuad
