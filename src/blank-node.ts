@@ -1,11 +1,41 @@
-'use strict'
 import ClassOrder from './class-order'
 import Node from './node-internal'
+import { IndexedFormula } from './index';
+import { TermType, BlankNodeTermType, TFBlankNode } from './types';
 
-export default class BlankNode extends Node {
-  constructor (id) {
+/**
+ * An RDF blank node is a Node without a URI
+ * @link https://rdf.js.org/data-model-spec/#blanknode-interface
+ */
+export default class BlankNode extends Node implements TFBlankNode {
+
+  termType: BlankNodeTermType;
+  static termType: BlankNodeTermType;
+
+  /**
+   * The identifier for the blank node
+   */
+  id: string;
+
+  /**
+   * Whether this is a blank node
+   */
+  isBlank: boolean;
+
+  /**
+   * The next unique identifier for blank nodes
+   */
+  static nextId: number;
+  static NTAnonymousNodePrefix: string;
+
+  /**
+   * Initializes this node
+   * @param id The identifier for the blank node
+   */
+  constructor (id?: string) {
     super()
     this.termType = BlankNode.termType
+    this.isBlank = true
 
     if (id) {
       if (typeof id !== 'string') {
@@ -42,7 +72,11 @@ export default class BlankNode extends Node {
     return 0
   }
 
-  copy (formula) { // depends on the formula
+  /**
+   * Gets a copy of this blank node in the specified formula
+   * @param formula The formula
+   */
+  copy (formula: IndexedFormula): BlankNode { // depends on the formula
     var bnodeNew = new BlankNode()
     formula.copyTo(this, bnodeNew)
     return bnodeNew
@@ -58,8 +92,8 @@ export default class BlankNode extends Node {
 }
 
 BlankNode.nextId = 0
-BlankNode.termType = 'BlankNode'
+BlankNode.termType = TermType.BlankNode
 BlankNode.NTAnonymousNodePrefix = '_:'
 BlankNode.prototype.classOrder = ClassOrder['BlankNode']
-BlankNode.prototype.isBlank = 1
-BlankNode.prototype.isVar = 1
+BlankNode.prototype.isBlank = true
+BlankNode.prototype.isVar = true

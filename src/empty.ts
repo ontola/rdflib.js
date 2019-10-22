@@ -1,10 +1,12 @@
-'use strict'
-import Node from './node'
+import Node from './node-internal'
 
 /**
- * Singleton subclass of an empty Collection.
- */
+* An empty node
+*/
 export default class Empty extends Node {
+
+  static termType: 'empty'
+
   constructor () {
     super()
     this.termType = Empty.termType

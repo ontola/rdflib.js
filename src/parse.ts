@@ -6,14 +6,41 @@ import { parseRDFaDOM } from './rdfaparser'
 import RDFParser from './rdfxmlparser'
 import sparqlUpdateParser from './patch-parser'
 import * as Util from './util'
+import Formula from './formula';
+import { TFQuad } from './types';
+
+/**
+ * Set of handled MIME types
+ */
+export type mimeTypes =
+  'application/ld+json' |
+  'application/n-quads' |
+  'application/nquads' |
+  'application/rdf+xml' |
+  'application/sparql-update' |
+  'application/xhtml+xml' |
+  'text/html' |
+  'text/n3' |
+  'text/turtle'
 
 /**
  * Parse a string and put the result into the graph kb.
  * Normal method is sync.
  * Unfortunately jsdonld is currently written to need to be called async.
  * Hence the mess below with executeCallback.
+ * @param str The input string to parse
+ * @param kb The store to use
+ * @param base The base URI to use
+ * @param contentType The content type for the input
+ * @param callback The callback to call when the data has been loaded
  */
-export default function parse (str, kb, base, contentType, callback) {
+export default function parse (
+  str: string,
+  kb: Formula,
+  base: string,
+  contentType?: string,
+  callback: (error: any, kb: Formula | null) => void
+) {
   contentType = contentType || 'text/turtle'
   contentType = contentType.split(';')[0]
   try {
@@ -47,7 +74,7 @@ export default function parse (str, kb, base, contentType, callback) {
     executeErrorCallback(e)
   }
 
-  parse.handled = {
+  (parse as any).handled= {
     'text/n3': true,
     'text/turtle': true,
     'application/rdf+xml': true,
@@ -67,16 +94,18 @@ export default function parse (str, kb, base, contentType, callback) {
     }
   }
 
-  function executeErrorCallback (e) {
-    if (contentType !== 'application/ld+json' ||
+  function executeErrorCallback (e: Error): void {
+    if (
+      contentType !== 'application/ld+json' ||
       contentType !== 'application/nquads' ||
-      contentType !== 'application/n-quads') {
+      contentType !== 'application/n-quads'
+    ) {
       if (callback) {
         callback(e, kb)
       } else {
         let e2 = new Error('' + e + ' while trying to parse <' + base + '> as ' + contentType)
         e2.cause = e
-        throw e2
+        throw e2.
       }
     }
   }
@@ -102,9 +131,9 @@ export default function parse (str, kb, base, contentType, callback) {
     }
   }
 
-  function tripleCallback (err, triple, prefixes) {
+  function tripleCallback (err: Error, triple: TFQuad) {
     if (triple) {
-      kb.add(triple)
+      kb.add(triple.subject, triple.predicate, triple.object, triple.graph)
     } else {
       callback(err, kb)
     }
