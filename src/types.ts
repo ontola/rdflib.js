@@ -3,7 +3,6 @@ import Variable from './variable';
 import BlankNode from './blank-node';
 import Collection from './collection';
 import Literal from './literal';
-import DefaultGraph from './default-graph';
 import NamedNode from './named-node';
 
 /**
@@ -14,6 +13,7 @@ export type BlankNodeTermType = "BlankNode" | TermType.BlankNode
 export type LiteralTermType = "Literal" | TermType.Literal
 export type VariableTermType = "Variable" | TermType.Variable
 export type CollectionTermType = "Collection" | TermType.Collection
+export type DefaultGraphTermType = "DefaultGraph" | TermType.DefaultGraph
 
 export enum TermType {
   NamedNode = "NamedNode",
@@ -21,6 +21,7 @@ export enum TermType {
   Literal = "Literal",
   Variable = "Variable",
   Collection = "Collection",
+  DefaultGraph = "DefaultGraph",
 }
 
 export type SomeTerm = RDFJSNamedNode | RDFJSBlankNode | RDFJSLiteral
@@ -60,7 +61,7 @@ export interface RDFJSBlankNode extends Term {
  * @link https://rdf.js.org/data-model-spec/#quad-interface
  */
 export interface RDFJSQuad<
-  S extends Term = Term,
+  S extends RDFJSNamedNode | RDFJSBlankNode = RDFJSNamedNode | RDFJSBlankNode,
   P extends RDFJSNamedNode = RDFJSNamedNode,
   O extends Term = SomeTerm,
   G extends RDFJSNamedNode | DefaultGraph = RDFJSNamedNode | DefaultGraph
@@ -108,6 +109,15 @@ export interface RDFJSVariable extends Term {
 };
 
 /**
+ * An instance of DefaultGraph represents the default graph. It's only allowed to assign a DefaultGraph to the graph property of a Quad.
+ */
+export interface RDFJSDefaultGraph extends Term {
+  termType: string;
+  value: '';
+  equals(other: Term): boolean
+};
+
+/**
 * A type for values that serves as inputs
 */
 export type ValueType = RDFJSNamedNode | Node | Date | string | number | boolean | undefined | null;
@@ -116,7 +126,7 @@ export interface Bindings {
   [id: string]: Node;
 }
 
-export type SubjectType = NamedNode | RDFJSNamedNode | Variable | BlankNode
+export type SubjectType = NamedNode | RDFJSNamedNode | Variable | RDFJSBlankNode
 export type PredicateType = NamedNode | RDFJSNamedNode | Variable
 export type ObjectType = NamedNode | RDFJSNamedNode | Literal | Collection | BlankNode | Variable
 export type GraphType = NamedNode | RDFJSNamedNode | DefaultGraph | Variable
