@@ -40,13 +40,13 @@ export default abstract class Node {
   static fromValue: <T extends ValueType>(value: ValueType) => T
 
   // Specified in './node.ts' to prevent circulur dependency
-  static toJS: (term: Node | Literal) => any
+  static toJS: (term: TFTerm) => TFTerm | boolean | number | Date | string | any[]
 
   /**
    * Gets the substituted node for this one, according to the specified bindings
    * @param bindings Bindings of identifiers to nodes
    */
-  substitute (bindings: Bindings): Node {
+  substitute (bindings: Bindings): TFTerm {
     console.log('@@@ node substitute' + this)
     return this
   }

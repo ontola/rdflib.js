@@ -5,6 +5,7 @@ import Collection from './collection';
 import Literal from './literal';
 import NamedNode from './named-node';
 import { TFNamedNode } from './types';
+import DefaultGraph from './default-graph';
 
 /**
  * Types that support both Enums (for typescript) and regular strings
@@ -21,8 +22,10 @@ export enum TermType {
   BlankNode = "BlankNode",
   Literal = "Literal",
   Variable = "Variable",
-  Collection = "Collection",
   DefaultGraph = "DefaultGraph",
+  // The next ones are not specified by the rdf.js taskforce
+  Collection = "Collection",
+  Graph = "Graph",
 }
 
 /**
@@ -30,6 +33,8 @@ export enum TermType {
  * We have RDFJS Taskforce types (standardized, generic), and RDFlib types (internal, specific).
  * When deciding which type to use in a function, it is preferable to accept generic inputs,
  * whenever possible, and provide strict outputs.
+ * In some ways, the TF types in here are a bit more strict.
+ * Variables are missing, and the statement requires specific types of terms (e.g. NamedNode instead of Term).
  */
 
 /**
@@ -67,10 +72,10 @@ export interface TFBlankNode extends TFTerm {
  * @link https://rdf.js.org/data-model-spec/#quad-interface
  */
 export interface TFQuad<
-  S extends TFNamedNode | TFBlankNode = TFNamedNode | TFBlankNode,
-  P extends TFNamedNode = TFNamedNode,
-  O extends TFTerm = TFObject,
-  G extends TFNamedNode | TFDefaultGraph = TFNamedNode | TFDefaultGraph
+  S extends TFSubject = TFSubject,
+  P extends TFPredicate = TFPredicate,
+  O extends TFObject = TFObject,
+  G extends TFGraph = TFGraph
 > {
   subject: S
   predicate: P
@@ -95,7 +100,7 @@ export interface TFLiteral extends TFTerm {
   language: string
   /** A NamedNode whose IRI represents the datatype of the literal. */
   datatype: TFNamedNode
-  equals(other: Literal): boolean
+  equals(other: TFTerm): boolean
 };
 
 /**
@@ -115,16 +120,16 @@ export interface TFVariable extends TFTerm {
 };
 
 /**
- * An instance of DefaultGraph represents the default graph. It's only allowed to assign a DefaultGraph to the graph property of a Quad.
+ * RDF.js taskforce DefaultGraph
+ * An instance of DefaultGraph represents the default graph.
+ * It's only allowed to assign a DefaultGraph to the graph property of a Quad.
+ * @link https://rdf.js.org/data-model-spec/#defaultgraph-interface
  */
 export interface TFDefaultGraph extends TFTerm {
-  termType: string;
+  termType: DefaultGraphTermType;
   value: '';
   equals(other: TFTerm): boolean
 };
-
-/** Any TFTerm that is suitable for the Object value */
-export type TFObject = TFNamedNode | TFBlankNode | TFLiteral
 
 /**
  * RDF.js taskforce DataFactory
@@ -166,36 +171,22 @@ export interface TFDataFactory {
 export type ValueType = TFTerm | Node | Date | string | number | boolean | undefined | null | Collection;
 
 export interface Bindings {
-  [id: string]: Node;
+  [id: string]: TFTerm;
 }
 
 export type TFSomeNode = TFBlankNode | TFNamedNode
-export type SubjectType = TFBlankNode | NamedNode | TFNamedNode | Variable
-export type TFPredicateType = TFNamedNode
-export type PredicateType = TFNamedNode | NamedNode | Variable
-export type ObjectType = TFObject | NamedNode | Literal | Collection | BlankNode | Variable
-export type GraphType = TFDefaultGraph | TFNamedNode | NamedNode | Variable
 export type SomeNode = NamedNode | BlankNode
 
-/**
- * Next types are related to DataFactories
- */
+/** A set of allowable input types for statements and related methods. */
 
-export type Indexable = number | string | unknown
+export type TFSubject = TFNamedNode | TFBlankNode
+export type TFPredicate = TFNamedNode
+export type TFObject = TFNamedNode | TFBlankNode | TFLiteral
+export type TFGraph = TFNamedNode | TFDefaultGraph
 
-export type Comparable = NamedNode | BlankNode | Literal | TFQuad | undefined | null
+/** RDFJS types */
 
-export enum Feature {
-  /** Whether the factory supports termType:Collection terms */
-  collections = "COLLECTIONS",
-  /** Whether the factory supports termType:DefaultGraph terms */
-  defaultGraphType = "DEFAULT_GRAPH_TYPE",
-  /** Whether the factory supports equals on produced instances */
-  equalsMethod = "EQUALS_METHOD",
-  /** Whether the factory supports mapping ids back to instances */
-  nodeLookup = "NODE_LOOKUP",
-  /** Whether the factory supports termType:Variable terms */
-  variableType = "VARIABLE_TYPE",
-}
-
-export type SupportTable = Record<Feature, boolean>
+export type SubjectType = NamedNode | Literal | Variable
+export type PredicateType = NamedNode | Variable
+export type ObjectType = NamedNode | Literal | Collection | BlankNode | Variable
+export type GraphType = DefaultGraph | NamedNode | Variable

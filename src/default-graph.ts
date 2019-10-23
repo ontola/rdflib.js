@@ -1,12 +1,16 @@
 import Node from './node-internal'
-import { TFDefaultGraph } from './types';
+import { TFDefaultGraph, TermType, DefaultGraphTermType } from './types';
 
+/**
+* The RDF default graph
+*/
 export default class DefaultGraph extends Node implements TFDefaultGraph {
   value: ''
+  termType: DefaultGraphTermType;
 
   constructor () {
     super()
-    this.termType = 'DefaultGraph'
+    this.termType = TermType.DefaultGraph
     this.value = ''
   }
   toCanonical () {

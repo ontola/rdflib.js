@@ -8,21 +8,26 @@ import Namespace from './namespace'
 import Node from './node-internal'
 import Serializer from './serialize'
 import Statement from './statement'
-import { appliedFactoryMethods, arrayToStatements, isStatement } from './utils'
+import { appliedFactoryMethods, arrayToStatements, isTFStatement } from './utils'
 import {
-  GraphType,
-  ObjectType,
-  SubjectType,
   TFTerm,
   ValueType,
-  TFPredicateType,
+  TFPredicate,
   TFDataFactory,
+  Bindings,
+  TFNamedNode,
+  TFSubject,
+  TFObject,
+  TFGraph,
+  TFQuad,
+  TermType,
+  TFBlankNode,
 } from './types'
 import Variable from './variable'
 import Literal from './literal'
 
 export function isFormula<T>(value: T | TFTerm): value is Formula {
-  return (value as Node).termType === 'Graph'
+  return (value as Node).termType === TermType.Graph
 }
 
 interface FormulaOpts {
@@ -31,16 +36,15 @@ interface FormulaOpts {
 
 /**
  * A formula, or store of RDF statements
- * @module formula
 */
 export default class Formula extends Node {
 
-  static termType: 'Graph';
+  static termType: TermType.Graph;
 
   /**
    * The stored statements
    */
-  statements: ReadonlyArray<Statement>;
+  statements: Statement[];
 
   /**
    * The additional constraints
@@ -56,7 +60,8 @@ export default class Formula extends Node {
 
   optional: ReadonlyArray<any>
 
-  rdfFactory: TFDataFactory | any
+  /** The factory used to generate statements and terms */
+  rdfFactory: TFDataFactory
 
   /**
    * Initializes this formula
@@ -65,10 +70,10 @@ export default class Formula extends Node {
    * @param initBindings The initial bindings
    * @param optional
    * @param opts
-   * @param {DataFactory} opts.rdfFactory - The rdf factory that should be used by the store
+   * @param opts.rdfFactory - The rdf factory that should be used by the store
    */
   constructor(
-    statements?: ReadonlyArray<Statement>,
+    statements?: Statement[],
     constraints?: ReadonlyArray<any>,
     initBindings?: {
         [id: string]: Node;
@@ -104,10 +109,10 @@ export default class Formula extends Node {
   * @param graph - the last part of the statemnt
   */
   add (
-    subject: SubjectType,
-    predicate: TFPredicateType,
-    object: ObjectType,
-    graph?: GraphType
+    subject: TFSubject,
+    predicate: TFPredicate,
+    object: TFObject,
+    graph?: TFGraph
   ) {
     return (this.statements as Statement[])
       .push(this.rdfFactory.quad(subject, predicate, object, graph))
@@ -124,7 +129,7 @@ export default class Formula extends Node {
    * Gets a blank node
    * @param id The node's identifier
    */
-  bnode(id: string): BlankNode {
+  bnode(id?: string): TFBlankNode {
     return this.rdfFactory.blankNode(id)
   }
 
@@ -132,7 +137,7 @@ export default class Formula extends Node {
    * Adds all the statements to this formula
    * @param statements A collection of statements
    */
-  addAll (statements: Statement[]): void {
+  addAll (statements: TFQuad[]): void {
     statements.forEach(quad => {
       this.add(quad.subject, quad.predicate, quad.object, quad.graph)
     })
@@ -144,18 +149,18 @@ export default class Formula extends Node {
   * any(me, knows, null, null)  - a person I know accoring to anything in store .
   * any(null, knows, me, null)  - a person who know me accoring to anything in store .
   *
-  * @param {Node} subject - A node to search for as subject, or if null, a wildcard
-  * @param {Node} predicate - A node to search for as predicate, or if null, a wildcard
-  * @param {Node} object - A node to search for as object, or if null, a wildcard
-  * @param {Node} graph - A node to search for as graph, or if null, a wildcard
-  * @returns {Node} - A node which match the wildcard position, or null
+  * @param subject - A node to search for as subject, or if null, a wildcard
+  * @param predicate - A node to search for as predicate, or if null, a wildcard
+  * @param object - A node to search for as object, or if null, a wildcard
+  * @param graph - A node to search for as graph, or if null, a wildcard
+  * @returns A node which match the wildcard position, or null
   */
   any(
-    s?: TFTerm | null,
-    p?: TFTerm | null,
-    o?: TFTerm | null,
-    g?: TFTerm | null
-  ): Node | null | void {
+    s?: TFSubject | null,
+    p?: TFPredicate | null,
+    o?: TFObject | null,
+    g?: TFGraph | null
+  ): TFTerm | null | void {
     var st = this.anyStatementMatching(s, p, o, g)
     if (st == null) {
       return void 0
@@ -177,10 +182,10 @@ export default class Formula extends Node {
    * @param g The graph that contains the statement
    */
   anyValue(
-    s?: TFTerm | null,
-    p?: TFTerm | null,
-    o?: TFTerm | null,
-    g?: TFTerm | null
+    s?: TFSubject | null,
+    p?: TFPredicate | null,
+    o?: TFObject | null,
+    g?: TFGraph | null
   ): string | void {
     var y = this.any(s, p, o, g)
     return y ? y.value : void 0
@@ -195,10 +200,10 @@ export default class Formula extends Node {
    * @param g The graph that contains the statement
    */
   anyJS(
-    s?: TFTerm | null,
-    p?: TFTerm | null,
-    o?: TFTerm | null,
-    g?: TFTerm | null
+    s?: TFSubject | null,
+    p?: TFPredicate | null,
+    o?: TFObject | null,
+    g?: TFGraph | null
   ): any {
     var y = this.any(s, p, o, g)
     return y ? Node.toJS(y) : void 0
@@ -212,12 +217,12 @@ export default class Formula extends Node {
    * @param why The graph that contains the statement
    */
   anyStatementMatching(
-    subj?: TFTerm | null,
-    pred?: TFTerm | null,
-    obj?: TFTerm | null,
-    why?: TFTerm | null
+    s?: TFSubject | null,
+    p?: TFPredicate | null,
+    o?: TFObject | null,
+    g?: TFGraph | null
   ): Statement | undefined {
-    var x = this.statementsMatching(subj, pred, obj, why)
+    var x = this.statementsMatching(s, p, o, g)
     if (!x || x.length === 0) {
       return undefined
     }
@@ -229,7 +234,7 @@ export default class Formula extends Node {
    *
    * Falls back to the rdflib hashString implementation if the given factory doesn't support id.
    */
-  id (term) {
+  id (term: TFTerm) {
     return this.rdfFactory.id(term)
   }
 
@@ -244,16 +249,16 @@ export default class Formula extends Node {
    * @returns {Array<Node>} - An array of nodes which match the wildcard position
    */
   statementsMatching(
-    subj?: TFTerm | null,
-    pred?: TFTerm | null,
-    obj?: TFTerm | null,
-    why?: TFTerm | null,
+    s?: TFSubject | null,
+    p?: TFPredicate | null,
+    o?: TFObject | null,
+    g?: TFGraph | null
     ): Statement[] {
     let found = this.statements.filter(st =>
-      (!subj || subj.equals(st.subject)) &&
-      (!pred || pred.equals(st.predicate)) &&
-      (!obj || obj.equals(st.object)) &&
-      (!why || why.equals(st.subject))
+      (!s || s.equals(st.subject)) &&
+      (!p || p.equals(st.predicate)) &&
+      (!o || o.equals(st.object)) &&
+      (!g || g.equals(st.subject))
      )
     return found
   }
@@ -321,10 +326,10 @@ export default class Formula extends Node {
   * @returns - An array of nodes which match the wildcard position
   */
   each(
-    s?: TFTerm | null,
-    p?: TFTerm | null,
-    o?: TFTerm | null,
-    g?: TFTerm | null
+    s?: TFSubject | null,
+    p?: TFPredicate | null,
+    o?: TFObject | null,
+    g?: TFGraph | null
   ): TFTerm[] {
     var elt: Statement, i: number, l: number, m: number, q: number
     var len: number, len1: number, len2: number, len3: number
@@ -507,7 +512,7 @@ export default class Formula extends Node {
    * We use NT representations in this version because they handle blank nodes.
    */
   findTypesNT(
-    subject: TFTerm
+    subject: TFSubject
   ): {
       [uri: string]: boolean;
   } {
@@ -563,10 +568,10 @@ export default class Formula extends Node {
    * think so.
    * Does NOT return terms, returns URI strings.
    * We use NT representations in this version because they handle blank nodes.
-   * @param subject A subject node
+   * @param subject - A subject node
    */
   findTypeURIs(
-    subject: TFTerm
+    subject: TFSubject
   ): {
       [uri: string]: boolean;
   } {
@@ -582,7 +587,7 @@ export default class Formula extends Node {
    */
   connectedStatements(
     subject: Node,
-    doc: GraphType,
+    doc: TFGraph,
     excludePredicateURIs: ReadonlyArray<string>
   ): Statement[] {
     excludePredicateURIs = excludePredicateURIs || []
@@ -634,8 +639,8 @@ export default class Formula extends Node {
    * This will only parse the strings generated by the vaious toNT() methods.
    * @param str A string representation
    */
-  fromNT(str: string): Node {
-    var dt, k, lang
+fromNT(str: string): TFTerm {
+    var dt: TFNamedNode | undefined, k: number, lang: string | undefined
     switch (str[0]) {
       case '<':
         return this.sym(str.slice(1, -1))
@@ -647,7 +652,7 @@ export default class Formula extends Node {
           if (str[k + 1] === '@') {
             lang = str.slice(k + 2)
           } else if (str.slice(k + 1, k + 3) === '^^') {
-            dt = this.fromNT(str.slice(k + 3))
+            dt = this.fromNT(str.slice(k + 3)) as TFNamedNode
           } else {
             throw new Error("Can't convert string from NT: " + str)
           }
@@ -656,7 +661,7 @@ export default class Formula extends Node {
         str = str.replace(/\\"/g, '"')
         str = str.replace(/\\n/g, '\n')
         str = str.replace(/\\\\/g, '\\')
-        return this.literal(str, lang || dt)
+        return this.literal(str, lang, dt)
       case '_':
         return this.rdfFactory.blankNode(str.slice(2))
       case '?':
@@ -673,10 +678,10 @@ export default class Formula extends Node {
    * @param g A containing graph
    */
   holds(
-    s?: TFTerm | Formula | null,
-    p?: TFTerm | null,
-    o?: TFTerm | null,
-    g?: TFTerm | null
+    s?: TFSubject | null,
+    p?: TFPredicate | null,
+    o?: TFObject | null,
+    g?: TFGraph | null
   ): boolean {
     var i
     if (arguments.length === 1) {
@@ -690,7 +695,7 @@ export default class Formula extends Node {
           }
         }
         return true
-      } else if (isStatement(s)) {
+      } else if (isTFStatement(s)) {
         return this.holds(s.subject, s.predicate, s.object, s.why)
       }
     }
@@ -711,9 +716,9 @@ export default class Formula extends Node {
     * Used by the n3parser to generate list elements
     * @param values - The values of the collection
     * @param context - The store
-    * @return {BlankNode|Collection} - The term for the statement
+    * @return The term for the statement
     */
-  list(values: Iterable<ValueType>, context): Collection {
+  list(values: Iterable<ValueType>, context): Collection | BlankNode {
     if (context.rdfFactory.supports["COLLECTIONS"]) {
       const collection = context.rdfFactory.collection()
       values.forEach(function (val) {
@@ -730,21 +735,20 @@ export default class Formula extends Node {
 
   /**
    * Gets a literal node
-   * @param val The literal's lexical value
-   * @param lang The language
-   * @param dt The datatype as a named node
+   * @param val - The literal's lexical value
+   * @param lang - The language
+   * @param dt - The datatype as a named node
    */
-  literal(val: string, lang: string, dt: NamedNode): Literal {
+  literal(val: string, lang: string, dt?: NamedNode): Literal {
     return new Literal('' + val, lang, dt)
   }
 
   /**
    * Transform a collection of NTriple URIs into their URI strings
-   * @param t some iterable colletion of NTriple URI strings
+   * @param t - some iterable colletion of NTriple URI strings
    * @return a collection of the URIs as strings
    * todo: explain why it is important to go through NT
    */
-
   NTtoURI(t: {
     [uri: string]: any;
   }): {
@@ -770,7 +774,7 @@ export default class Formula extends Node {
    */
   serialize(base: string, contentType: string, provenance: string): string {
     var documentString
-    var sts
+    var sts: Statement[]
     var sz
     sz = Serializer(this)
     sz.suggestNamespaces(this.namespaces)
@@ -824,17 +828,17 @@ export default class Formula extends Node {
 
   /**
    * Gets the node matching the specified pattern
-   * @param s The subject
-   * @param p The predicate
-   * @param o The object
-   * @param g The graph that contains the statement
+   * @param s - The subject
+   * @param p - The predicate
+   * @param o - The object
+   * @param g - The graph that contains the statement
    */
   the(
-    s?: Node | null,
-    p?: Node | null,
-    o?: Node | null,
-    g?: Node | null
-  ): Node | void | null {
+    s?: TFSubject | null,
+    p?: TFPredicate | null,
+    o?: TFObject | null,
+    g?: TFGraph | null
+  ): TFTerm | void | null {
     var x = this.any(s, p, o, g)
     if (x == null) {
       log.error('No value found for the() {' + s + ' ' + p + ' ' + o + '}.')
@@ -846,15 +850,15 @@ export default class Formula extends Node {
    * RDFS Inference
    * These are hand-written implementations of a backward-chaining reasoner
    * over the RDFS axioms.
-   * @param seeds A hash of NTs of classes to start with
-   * @param predicate The property to trace though
-   * @param inverse Trace inverse direction
+   * @param seeds - A hash of NTs of classes to start with
+   * @param predicate - The property to trace though
+   * @param inverse - Trace inverse direction
    */
   transitiveClosure(
     seeds: {
         [uri: string]: boolean;
     },
-    predicate: Node,
+    predicate: TFPredicate,
     inverse?: boolean
   ): {
       [uri: string]: boolean;
@@ -894,7 +898,7 @@ export default class Formula extends Node {
    * Finds the types in the list which have no *stored* supertypes
    * We exclude the universal class, owl:Things and rdf:Resource, as it is
    * information-free.
-   * @param types The types
+   * @param types - The types
    */
   topTypeURIs(types: {
     [id: string]: string | NamedNode;
@@ -946,25 +950,25 @@ export default class Formula extends Node {
    * Gets a new variable
    * @param name The variable's name
    */
-  variable (name: string): Variable
+  variable?: (name: string) => Variable
 
   /**
-   * Gets the number of statements in this formulat that matches the specified pattern
-   * @param s The subject
-   * @param p The predicate
-   * @param o The object
-   * @param g The graph that contains the statement
+   * Gets the number of statements in this formula that matches the specified pattern
+   * @param s - The subject
+   * @param p - The predicate
+   * @param o - The object
+   * @param g - The graph that contains the statement
    */
   whether(
-    s?: Node | null,
-    p?: Node | null,
-    o?: Node | null,
-    g?: Node | null
+    s?: TFSubject | null,
+    p?: TFPredicate | null,
+    o?: TFObject | null,
+    g?: TFGraph | null
   ): number {
     return this.statementsMatching(s, p, o, g).length
   }
 }
-Formula.termType = 'Graph'
+Formula.termType = TermType.Graph
 
 Formula.prototype.classOrder = ClassOrder['Graph']
 Formula.prototype.isVar = false

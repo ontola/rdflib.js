@@ -6,7 +6,7 @@ import Literal from './literal'
 import { ValueType, TFTerm } from './types'
 import Namespace from './namespace'
 import { isCollection } from './collection';
-import { isLiteral } from './literal';
+import { isTFLiteral } from './literal';
 
 export default Node
 
@@ -43,11 +43,11 @@ const ns = { xsd: Namespace('http://www.w3.org/2001/XMLSchema#') }
  * Gets the javascript object equivalent to a node
  * @param term The RDF node
  */
-Node.toJS = function (term: TFTerm) {
+Node.toJS = function (term: TFTerm): TFTerm | boolean | number | Date | string | any[] {
   if (isCollection(term)) {
     return term.elements.map(Node.toJS) // Array node (not standard RDFJS)
   }
-  if (!isLiteral(term)) return term
+  if (!isTFLiteral(term)) return term
   if (term.datatype.equals(ns.xsd('boolean'))) {
     return term.value === '1'
   }

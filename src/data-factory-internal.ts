@@ -3,14 +3,22 @@ import Literal from './literal'
 import NamedNode from './named-node'
 import Statement from './statement'
 import Variable from './variable'
+import { TFSubject, TFPredicate, TFObject, TFGraph, TFNamedNode } from './types'
 
 export const defaultGraphURI = 'chrome:theSession'
 
-function blankNode (value) {
+/**
+ * Creates a new blank node
+ * @param value The blank node's identifier
+ */
+function blankNode(value: string): BlankNode {
   return new BlankNode(value)
 }
 
-function defaultGraph () {
+/**
+ * Gets the default graph
+ */
+function defaultGraph(): TFNamedNode {
   return new NamedNode(defaultGraphURI)
 }
 
@@ -44,9 +52,17 @@ function id (term) {
   }
 }
 
-function literal (value, languageOrDatatype) {
+/**
+ * Creates a new literal node
+ * @param value The lexical value
+ * @param languageOrDatatype Either the language or the datatype
+ */
+function literal(
+  value: string,
+  languageOrDatatype?: string | TFNamedNode
+): Literal {
   if (typeof value !== "string" && !languageOrDatatype) {
-    return Literal.fromValue(value)
+    return Literal.fromValue(value) as Literal
   }
 
   const strValue = typeof value === 'string' ? value : '' + value
@@ -60,14 +76,37 @@ function literal (value, languageOrDatatype) {
     return new Literal(strValue, null, languageOrDatatype)
   }
 }
-function namedNode (value) {
+
+/**
+ * Creates a new named node
+ * @param value The new named node
+ */
+function namedNode(value: string): NamedNode {
   return new NamedNode(value)
 }
-function quad (subject, predicate, object, graph) {
+
+/**
+* Creates a new statement
+* @param subject The subject
+* @param predicate The predicate
+* @param object The object
+* @param graph The containing graph
+*/
+function quad(
+  subject: TFSubject,
+  predicate: TFPredicate,
+  object: TFObject,
+  graph?: TFGraph
+): Statement {
   graph = graph || defaultGraph()
   return new Statement(subject, predicate, object, graph)
 }
-function variable (name) {
+
+/**
+ * Creates a new variable
+ * @param name The name for the variable
+ */
+function variable(name?: string): Variable {
   return new Variable(name)
 }
 

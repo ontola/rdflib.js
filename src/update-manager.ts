@@ -11,8 +11,10 @@ import DataFactory from './data-factory'
 import Namespace from './namespace'
 import Serializer from './serializer'
 import { join as uriJoin } from './uri'
-import { isStore } from './util'
+import { isStore } from './utils'
 import * as Util from './util'
+import Node from './node';
+import Statement from './statement';
 
 /** Update Manager
 *
@@ -23,12 +25,18 @@ import * as Util from './util'
 */
 
 export default class UpdateManager {
-  /** @constructor
-   * @param {IndexedFormula} store - the quadstore to store data and metadata. Created if not passed.f
+
+  store: IndexedFormula
+
+  /** Object of namespaces */
+  ns: any
+
+  /**
+   * @param  store - The quadstore to store data and metadata. Created if not passed.
   */
-  constructor (store) {
+  constructor (store?: IndexedFormula) {
     store = store || new IndexedFormula() // If none provided make a store
-    this.store = store
+    this.store = (store as IndexedFormula)
     if (store.updater) {
       throw new Error("You can't have two UpdateManagers for the same store")
     }
@@ -1003,18 +1011,18 @@ export default class UpdateManager {
   }
 
   /**
-   * This is suitable for an initial creation of a document
-   *
-   * @param doc {Node}
-   * @param data {string|Array<Statement>}
-   * @param contentType {string}
-   * @param callbackFunction {Function}  callbackFunction(uri, ok, message, response)
-   *
-   * @throws {Error} On unsupported content type (via serialize())
-   *
-   * @returns {Promise}
+     * This is suitable for an initial creation of a document.
+     * @param document
+     * @param data
+     * @param contentType
+     * @param callback
    */
-  put (doc, data, contentType, callbackFunction) {
+  put(
+    document: Node,
+    data: string | ReadonlyArray<Statement>,
+    contentType: string,
+    callback: (uri: string, ok: boolean, errorMessage: string, response?: unknown) => void,
+  ): Promise<void> {
     const kb = this.store
     let documentString
 

@@ -10,6 +10,7 @@
  *
  *  2005-10 Written Tim Berners-Lee
  *  2007    Changed so as not to munge statements from documents when smushing
+ *  2019    Converted to typescript
  *
  *
 */
@@ -18,15 +19,20 @@
 
 import ClassOrder from './class-order'
 import { defaultGraphURI } from './data-factory-internal'
-import DataFactory from './data-factory'
 import Formula from './formula'
-import { ArrayIndexOf, isStatement, isStore, RDFArrayRemove } from './util'
-import Statement from './statement'
+import { ArrayIndexOf, isTFStatement, isStore } from './utils'
 import Node from './node'
 import Variable from './variable'
 import { Query, indexedFormulaQuery } from './query'
+import { RDFArrayRemove } from './util';
+import UpdateManager from './update-manager';
+import { TFDataFactory, Bindings, TFTerm, TFPredicate, TFSubject, TFObject, TFGraph } from './types'
+import { NamedNode } from './index'
+import Statement from './statement';
 
 const owlNamespaceURI = 'http://www.w3.org/2002/07/owl#'
+
+type FeaturesType = Array<('sameAs' | 'InverseFunctionalProperty' | 'FunctionalProperty')> | undefined
 
 export { defaultGraphURI }
 // var link_ns = 'http://www.w3.org/2007/ont/link#'
@@ -67,30 +73,63 @@ function handleRDFType (formula, subj, pred, obj, why) {
   }
   return done // statement given is not needed if true
 }
+
 /**
  * Indexed Formula aka Store
  */
 export default class IndexedFormula extends Formula { // IN future - allow pass array of statements to constructor
   /**
-   * @constructor
-   * @param {Array<String>} features - What sort of autmatic processing to do? Array of string
-   * @param {Boolean} features.sameAs - Smush together A and B nodes whenever { A sameAs B }
-   * @param opts
-   * @param {DataFactory} opts.rdfFactory - The data factory that should be used by the store
+   * An UpdateManager initialised to this store
    */
-  constructor (features, opts = {}) {
+  updater?: UpdateManager
+
+  /**
+   * Dictionary of namespace prefixes
+   */
+  namespaces: {[key: string]: string}
+
+  handleRDFType?: () => any
+
+  /** Array of functions to call when adding { s type X } */
+  classActions: Function[]
+  /** Array of functions to call when getting statement with {s X o} */
+  propertyActions: Function[]
+  /** Redirect to lexically smaller equivalent symbol */
+  redirections: any[]
+  /** Reverse mapping to redirection: aliases for this */
+  aliases: any[]
+  /** Redirections we got from HTTP */
+  HTTPRedirects: any[]
+  /** Array of statements with this X as subject */
+  subjectIndex: any[]
+  /** Array of statements with this X as predicate */
+  predicateIndex: any[]
+  /** Array of statements with this X as object */
+  objectIndex: any[]
+  /** Array of statements with X as provenance */
+  whyIndex: any[]
+  index: any[]
+  features: FeaturesType
+
+  /**
+   * Creates a new formula
+   * @param features - What sort of autmatic processing to do? Array of string
+   * @param features.sameAs - Smush together A and B nodes whenever { A sameAs B }
+   * @param opts
+   * @param opts.rdfFactory - The data factory that should be used by the store
+   */
+  constructor (features: FeaturesType, opts?: { rdfFactory: TFDataFactory}) {
     super(undefined, undefined, undefined, undefined, opts)
 
-    this.propertyActions = [] // Array of functions to call when getting statement with {s X o}
-    // maps <uri> to [f(F,s,p,o),...]
-    this.classActions = [] // Array of functions to call when adding { s type X }
-    this.redirections = [] // redirect to lexically smaller equivalent symbol
-    this.aliases = [] // reverse mapping to redirection: aliases for this
-    this.HTTPRedirects = [] // redirections we got from HTTP
-    this.subjectIndex = [] // Array of statements with this X as subject
-    this.predicateIndex = [] // Array of statements with this X as subject
-    this.objectIndex = [] // Array of statements with this X as object
-    this.whyIndex = [] // Array of statements with X as provenance
+    this.propertyActions = []
+    this.classActions = []
+    this.redirections = []
+    this.aliases = []
+    this.HTTPRedirects = []
+    this.subjectIndex = []
+    this.predicateIndex = []
+    this.objectIndex = []
+    this.whyIndex = []
     this.index = [
       this.subjectIndex,
       this.predicateIndex,
@@ -107,11 +146,18 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     this.initPropertyActions(this.features)
   }
 
-  static get defaultGraphURI () {
+  /**
+   * Gets the URI of the default graph
+   */
+  static get defaultGraphURI(): string {
     return defaultGraphURI
   }
 
-  substitute (bindings) {
+  /**
+   * Gets this graph with the bindings substituted
+   * @param bindings The bindings
+   */
+  substitute(bindings: Bindings): IndexedFormula {
     var statementsCopy = this.statements.map(function (ea) {
       return ea.substitute(bindings)
     })
@@ -120,7 +166,21 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     return y
   }
 
-  applyPatch (patch, target, patchCallback) { // patchCallback(err)
+  /**
+   * Apply a set of statements to be deleted and to be inserted
+   *
+   * @param patch The set of statements to be deleted and to be inserted
+   * @param target The name of the document to patch
+   * @param patchCallback Callback to be called when patching is complete
+   */
+  applyPatch(
+    patch: {
+        delete?: ReadonlyArray<Statement>,
+        patch?: ReadonlyArray<Statement>
+    },
+    target: NamedNode,
+    patchCallback: (errorString: string) => void
+  ): void {
     var targetKB = this
     var ds
     var binding = null
@@ -132,9 +192,9 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
         // console.log('ds before substitute: ' + ds)
         if (binding) ds = ds.substitute(binding)
         // console.log('applyPatch: delete: ' + ds)
-        ds = ds.statements
+        ds = ds.statements as Statement[]
         var bad = []
-        var ds2 = ds.map(function (st) { // Find the actual statemnts in the store
+        var ds2 = ds.map(function (st: Statement) { // Find the actual statemnts in the store
           var sts = targetKB.statementsMatching(st.subject, st.predicate, st.object, target)
           if (sts.length === 0) {
             // log.info("NOT FOUND deletable " + st)
@@ -197,13 +257,21 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     }
   }
 
-  declareExistential (x) {
+  /**
+   * N3 allows for declaring blank nodes, this function enables that support
+   *
+   * @param x The blank node to be declared, supported in N3
+   */
+  declareExistential(x: Node): Node {
     if (!this._existentialVariables) this._existentialVariables = []
     this._existentialVariables.push(x)
     return x
   }
 
-  initPropertyActions (features) {
+  /**
+   * @param features
+   */
+  initPropertyActions(features: FeaturesType) {
     // If the predicate is #type, use handleRDFType to create a typeCallback on the object
     this.propertyActions[this.rdfFactory.id(this.rdfFactory.namedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'))] =
       [ handleRDFType ]
@@ -238,20 +306,25 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   /**
    * Adds a triple (quad) to the store.
    *
-   * @param {Term} subject - The thing about which the fact a relationship is asserted
-   * @param {namedNode} predicate - The relationship which is asserted
-   * @param {Term} object - The object of the relationship, e.g. another thing or avalue
-   * @param {namedNode} why - The document in which the triple (S,P,O) was or will be stored on the web
-   * @returns {Statement} The statement added to the store
+   * @param subject - The thing about which the fact a relationship is asserted
+   * @param predicate - The relationship which is asserted
+   * @param object - The object of the relationship, e.g. another thing or avalue
+   * @param why - The document in which the triple (S,P,O) was or will be stored on the web
+   * @returns The statement added to the store
    */
-  add (subj, pred, obj, why) {
+  add (
+    subj: TFSubject,
+    pred: TFPredicate,
+    obj: TFObject,
+    why: TFGraph
+  ): Statement {
     var i
     if (arguments.length === 1) {
       if (subj instanceof Array) {
         for (i = 0; i < subj.length; i++) {
           this.add(subj[i])
         }
-      } else if (isStatement(subj)) {
+      } else if (isTFStatement(subj)) {
         this.add(subj.subject, subj.predicate, subj.object, subj.why)
       } else if (isStore(subj)) {
         this.add(subj.statements)
@@ -312,8 +385,9 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
 
   /**
    * Returns the symbol with canonical URI as smushed
+   * @param term A RDF node
    */
-  canon (term) {
+  canon(term: Node): Node {
     if (!term) {
       return term
     }
@@ -324,7 +398,11 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     return y
   }
 
-  check () {
+
+  /**
+   * Checks this formula for consistency
+   */
+  check(): void {
     this.checkStatementList(this.statements)
     for (var p = 0; p < 4; p++) {
       var ix = this.index[p]
@@ -337,10 +415,11 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   }
 
   /**
-   * Self-consistency checking for diagnostis only
-   * Is each statement properly indexed?
+   * Checks a list of statements for consistency
+   * @param sts The list of statements to check
+   * @param from An index with the array ['subject', 'predicate', 'object', 'why']
    */
-  checkStatementList (sts, from) {
+  checkStatementList(sts: ReadonlyArray<Statement>, from: number): boolean {
     var names = ['subject', 'predicate', 'object', 'why']
     var origin = ' found in ' + names[from] + ' index.'
     var st
@@ -374,16 +453,18 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     }
   }
 
-  close () {
+  /**
+   * Closes this formula (and return it)
+   */
+  close(): IndexedFormula {
     return this
   }
 
-  compareTerm(u1, u2) {
+  compareTerm(u1, u2): number {
     // Keep compatibility with downstream classOrder changes
     if (Object.prototype.hasOwnProperty.call(u1, "compareTerm")) {
       return u1.compareTerm(u2)
     }
-
     if (ClassOrder[u1.termType] < ClassOrder[u2.termType]) {
       return -1
     }
@@ -399,13 +480,19 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     return 0
   }
 
+
   /**
-   * replaces @template with @target and add appropriate triples (no triple
-   * removed)
-   * one-direction replication
-   * @method copyTo
+   * replaces @template with @target and add appropriate triples
+   * removes no triples by default and is a one-direction replication
+   * @param template node to copy
+   * @param target node to copy to
+   * @param flags Whether or not to do a two-directional copy and/or delete triples
    */
-  copyTo (template, target, flags) {
+  copyTo(
+    template: Node,
+    target: Node,
+    flags?: Array<('two-direction' | 'delete')>
+  ): void {
     if (!flags) flags = []
     var statList = this.statementsMatching(template)
     if (ArrayIndexOf(flags, 'two-direction') !== -1) {
@@ -429,10 +516,12 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   }
 
   /**
-   * simplify graph in store when we realize two identifiers are equivalent
+   * Simplify graph in store when we realize two identifiers are equivalent
    * We replace the bigger with the smaller.
+   * @param u1 The first node
+   * @param u2 The second node
    */
-  equate (u1, u2) {
+  equate(u1: Node, u2: Node): boolean {
     // log.warn("Equating "+u1+" and "+u2); // @@
     // @@JAMBO Must canonicalize the uris to prevent errors from a=b=c
     // 03-21-2010
@@ -451,7 +540,12 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     }
   }
 
-  formula (features) {
+  /**
+   * Creates a new empty indexed formula
+   * Only applicable for IndexedFormula, but TypeScript won't allow a subclass to override a property
+   * @param features The list of features
+   */
+  formula(features: ReadonlyArray<string>): IndexedFormula {
     return new IndexedFormula(features)
   }
 
@@ -465,7 +559,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    *    ```
    * @returns {Number}
    */
-  get length () {
+  get length (): number {
     return this.statements.length
   }
 
@@ -473,13 +567,17 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * Returns any quads matching the given arguments.
    * Standard RDFJS Taskforce method for Source objects, implemented as an
    * alias to `statementsMatching()`
-   * @method match
-   * @param subject {Node|String|Object}
-   * @param predicate {Node|String|Object}
-   * @param object {Node|String|Object}
-   * @param graph {NamedNode|String}
+   * @param subject The subject
+   * @param predicate The predicate
+   * @param object The object
+   * @param graph The graph that contains the statement
    */
-  match (subject, predicate, object, graph) {
+  match(
+    subject: TFTerm,
+    predicate: TFTerm,
+    object: TFTerm,
+    graph: TFTerm
+  ): Statement[] {
     return this.statementsMatching(
       Node.fromValue(subject),
       Node.fromValue(predicate),
@@ -490,22 +588,34 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
 
   /**
    * Find out whether a given URI is used as symbol in the formula
+   * @param uri The URI to look for
    */
-  mentionsURI (uri) {
+  mentionsURI(uri: string): boolean {
     var hash = '<' + uri + '>'
     return (!!this.subjectIndex[hash] ||
     !!this.objectIndex[hash] ||
     !!this.predicateIndex[hash])
   }
 
-  // Existentials are BNodes - something exists without naming
-  newExistential (uri) {
+  /**
+   * Existentials are BNodes - something exists without naming
+   * @param uri An URI
+   */
+  newExistential(uri: string): TFTerm {
     if (!uri) return this.bnode()
     var x = this.sym(uri)
     return this.declareExistential(x)
   }
 
-  newPropertyAction (pred, action) {
+  /**
+   * Adds a new property action
+   * @param pred the predicate that the function should be triggered on
+   * @param action the function that should trigger
+   */
+  newPropertyAction(
+    pred: TFPredicate,
+    action: (store: IndexedFormula, subject: TFSubject, object: TFObject) => boolean
+  ): boolean {
     // log.debug("newPropertyAction:  "+pred)
     var hash = this.id(pred)
     if (!this.propertyActions[hash]) {
@@ -521,8 +631,13 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     return done
   }
 
-  // Universals are Variables
-  newUniversal (uri) {
+
+  /**
+   * Creates a new universal node
+   * Universals are Variables
+   * @param uri An URI
+   */
+  newUniversal(uri: string): TFTerm {
     var x = this.sym(uri)
     if (!this._universalVariables) this._universalVariables = []
     this._universalVariables.push(x)
@@ -537,24 +652,38 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   /**
    * Find an unused id for a file being edited: return a symbol
    * (Note: Slow iff a lot of them -- could be O(log(k)) )
+   * @param doc A document named node
    */
-  nextSymbol (doc) {
+  nextSymbol(doc: NamedNode): NamedNode {
     for (var i = 0; ;i++) {
       var uri = doc.uri + '#n' + i
       if (!this.mentionsURI(uri)) return this.sym(uri)
     }
   }
 
-  query (myQuery, callback, dummy, onDone) {
+  /**
+   * Query this store asynchronously, return bindings in callback
+   *
+   * @param myQuery The query to be run
+   * @param callback Function to call when bindings
+   * @param dummy OBSOLETE - do not use this
+   * @param onDone OBSOLETE - do not use this
+   */
+  query(
+    myQuery: Query,
+    callback: (bindings: Bindings) => void,
+    dummy?: null,
+    onDone?: () => void
+  ): void {
     return indexedFormulaQuery.call(this, myQuery, callback, dummy, onDone)
   }
 
-/** Query this store synchhronously and return bindings
- *
- * @param myQuery {Query} - the query object
- * @returns {Array<Bindings>}
- */
-  querySync (myQuery) {
+  /**
+   * Query this store synchronously and return bindings
+   *
+   * @param myQuery The query to be run
+   */
+  querySync(myQuery: Query): Bindings[] {
     function saveBinginds (bindings) {
       results.push(bindings)
     }
@@ -573,9 +702,10 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   }
 
   /**
-   * Finds a statement object and removes it
+   * Removes a statement from this formula
+   * @param st A statement to remove
    */
-  remove (st) {
+  remove(st: Statement): IndexedFormula {
     if (st instanceof Array) {
       for (var i = 0; i < st.length; i++) {
         this.remove(st[i])
@@ -585,8 +715,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     if (isStore(st)) {
       return this.remove(st.statements)
     }
-    var sts = this.statementsMatching(st.subject, st.predicate, st.object,
-      st.why)
+    var sts = this.statementsMatching(st.subject, st.predicate, st.object, st.why)
     if (!sts.length) {
       throw new Error('Statement to be removed is not on store: ' + st)
     }
@@ -596,8 +725,9 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
 
   /**
    * Removes all statemnts in a doc
+   * @param doc The document
    */
-  removeDocument (doc) {
+  removeDocument(doc: NamedNode): IndexedFormula {
     var sts = this.statementsMatching(undefined, undefined, undefined, doc).slice() // Take a copy as this is the actual index
     for (var i = 0; i < sts.length; i++) {
       this.removeStatement(sts[i])
@@ -606,9 +736,20 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   }
 
   /**
-   * remove all statements matching args (within limit) *
+   * Remove all statements matching args (within limit) *
+   * @param subj The subject
+   * @param pred The predicate
+   * @param obj The object
+   * @param why The graph that contains the statement
+   * @param limit The number of statements to remove
    */
-  removeMany (subj, pred, obj, why, limit) {
+  removeMany(
+    subj?: Node | null,
+    pred?: Node | null,
+    obj?: Node | null,
+    why?: Node | null,
+    limit?: number
+  ): void {
     // log.debug("entering removeMany w/ subj,pred,obj,why,limit = " + subj +", "+ pred+", " + obj+", " + why+", " + limit)
     var sts = this.statementsMatching(subj, pred, obj, why, false)
     // This is a subtle bug that occcured in updateCenter.js too.
@@ -621,7 +762,19 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     for (i = 0; i < statements.length; i++) this.remove(statements[i])
   }
 
-  removeMatches (subject, predicate, object, why) {
+  /**
+   * Remove all matching statements
+   * @param subject The subject
+   * @param predicate The predicate
+   * @param object The object
+   * @param graph The graph that contains the statement
+   */
+  removeMatches(
+    subject?: Node | null,
+    predicate?: Node | null,
+    object?: Node | null,
+    graph?: Node | null
+  ): IndexedFormula {
     this.removeStatements(this.statementsMatching(subject, predicate, object,
       why))
     return this
@@ -630,11 +783,11 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   /**
    * Remove a particular statement object from the store
    *
-   * st    a statement which is already in the store and indexed.
-   *      Make sure you only use this for these.
-   *    Otherwise, you should use remove() above.
+   * @param st - a statement which is already in the store and indexed.
+   *        Make sure you only use this for these.
+   *        Otherwise, you should use remove() above.
    */
-  removeStatement (st) {
+  removeStatement(st: Statement): IndexedFormula {
     // log.debug("entering remove w/ st=" + st)
     var term = [ st.subject, st.predicate, st.object, st.why ]
     for (var p = 0; p < 4; p++) {
@@ -650,7 +803,11 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     return this
   }
 
-  removeStatements (sts) {
+  /**
+   * Removes statements
+   * @param sts The statements to remove
+   */
+  removeStatements(sts: ReadonlyArray<Statement>): IndexedFormula {
     for (var i = 0; i < sts.length; i++) {
       this.remove(sts[i])
     }
@@ -708,8 +865,9 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
 
   /**
    * Return all equivalent URIs by which this is known
+   * @param x A named node
    */
-  allAliases (x) {
+  allAliases(x: NamedNode): NamedNode[] {
     var a = this.aliases[this.id(this.canon(x))] || []
     a.push(this.canon(x))
     return a
@@ -717,8 +875,10 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
 
   /**
    * Compare by canonical URI as smushed
+   * @param x A named node
+   * @param y Another named node
    */
-  sameThings (x, y) {
+  sameThings(x: NamedNode, y: NamedNode): boolean {
     if (x.equals(y)) {
       return true
     }
@@ -754,7 +914,13 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * @param {Boolean} justOne - flag - stop when found one rather than get all of them?
    * @returns {Array<Node>} - An array of nodes which match the wildcard position
    */
-  statementsMatching (subj, pred, obj, why, justOne) {
+
+  statementsMatching (
+    subj: TFTerm,
+    pred: TFTerm,
+    obj: TFTerm,
+    why: TFTerm
+  ): Statement[] {
     // log.debug("Matching {"+subj+" "+pred+" "+obj+"}")
     var pat = [ subj, pred, obj, why ]
     var pattern = []
@@ -828,9 +994,10 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   }
 
   /**
-   *  A list of all the URIs by which this thing is known
+   * A list of all the URIs by which this thing is known
+   * @param term
    */
-  uris (term) {
+  uris(term: NamedNode): string[] {
     var cterm = this.canon(term)
     var terms = this.aliases[this.id(cterm)]
     if (!cterm.uri) return []

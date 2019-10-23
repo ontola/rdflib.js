@@ -3,8 +3,9 @@ import Node from './node-internal'
 import XSD from './xsd-internal'
 import { ValueType, TFTerm, LiteralTermType, TFLiteral, TFNamedNode, TermType } from './types'
 import classOrder from './class-order'
+import { isTFTerm } from './utils'
 
-export function isLiteral<T>(value: T | TFTerm): value is TFLiteral {
+export function isTFLiteral<T>(value: T | TFTerm): value is TFLiteral {
   return (value as TFTerm).termType === TermType.Literal
 }
 
@@ -74,6 +75,7 @@ export default class Literal extends Node implements TFLiteral {
       ((!this.datatype && !(other as Literal).datatype) ||
         (this.datatype && this.datatype.equals((other as Literal).datatype)))
   }
+
   /**
    * The language for the literal
    */
@@ -145,7 +147,7 @@ export default class Literal extends Node implements TFLiteral {
     if (typeof value !== 'number') {
       throw new TypeError('Invalid argument to Literal.fromNumber()')
     }
-    let datatype
+    let datatype: TFNamedNode
     const strValue = value.toString()
     if (strValue.indexOf('e') < 0 && Math.abs(value) <= Number.MAX_SAFE_INTEGER) {
       datatype = Number.isInteger(value) ? XSD.integer : XSD.decimal
@@ -159,9 +161,9 @@ export default class Literal extends Node implements TFLiteral {
    * Builds a literal node from an input value
    * @param value The input value
    */
-  static fromValue(value: ValueType): Literal | Node {
-    if (Object.prototype.hasOwnProperty.call(value, 'termType')) {  // this is a Node instance
-      return value as Node
+  static fromValue(value: ValueType): TFTerm {
+    if (isTFTerm(value)) {
+      return value
     }
     switch (typeof value) {
       case 'object':

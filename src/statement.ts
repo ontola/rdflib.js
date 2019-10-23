@@ -1,11 +1,10 @@
-import { Bindings, SubjectType, PredicateType, ObjectType, GraphType, TFQuad, TFNamedNode, SomeNode } from './types'
+import { Bindings, SubjectType, PredicateType, ObjectType, GraphType, TFQuad, TFNamedNode, SomeNode, TermType } from './types'
 import Literal from './literal'
 import Node from './node-internal'
 import { NamedNode, Collection, defaultGraph } from './index';
 import BlankNode from './blank-node';
-import Variable from './variable';
 
-type StObjectType = NamedNode | Literal | Collection | BlankNode | Variable
+type StObjectType = NamedNode | Literal | Collection | BlankNode
 
 /** A Statement represents an RDF Triple or Quad. */
 export default class Statement implements TFQuad<SomeNode, NamedNode, StObjectType, NamedNode> {
@@ -51,7 +50,7 @@ export default class Statement implements TFQuad<SomeNode, NamedNode, StObjectTy
     this.object = Node.fromValue(object)
     this.why = why as NamedNode  // property currently used by rdflib
     if (why == undefined) {
-      this.why = defaultGraph
+      this.why = defaultGraph()
     }
   }
 
@@ -102,7 +101,7 @@ export default class Statement implements TFQuad<SomeNode, NamedNode, StObjectTy
       this.predicate.toCanonical(),
       this.object.toCanonical()
     ]
-    if (this.graph && this.graph.termType !== 'DefaultGraph') {
+    if (this.graph && this.graph.termType !== TermType.DefaultGraph) {
         terms.push(this.graph.toCanonical())
     }
     return terms.join(' ') + ' .'

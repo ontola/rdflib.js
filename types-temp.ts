@@ -18,15 +18,6 @@ import { NamedNode } from './src';
 // TypeScript Version: 3.0
 // Acknowledgements: This work has been financed by Logilab SA, FRANCE, logilab.fr
 
-/**
-* The RDF default graph
-*/
-export interface DefaultGraph extends Node {
-  /**
-   * Initializes this graph
-   */
-  constructor();
-}
 export namespace uri {
   /**
    * Gets the document part of an URI
@@ -114,389 +105,6 @@ export namespace convert {
       nquadCallback: (err: string, nquadString: string) => void
   ): void;
 }
-/**
-* A formula, or store of RDF statements
-*/
-export interface Formula extends Node {
-  /**
-   * The stored statements
-   */
-  statements: Statement[];
-  /**
-   * Initializes this formula
-   * @param statements The initial statements in this formulat
-   * @param constraints The additional constraints
-   * @param initBindings The initial bindings
-   * @param optional
-   */
-  constructor(
-      statements: ReadonlyArray<Statement>,
-      constraints: ReadonlyArray<any>,
-      initBindings: {
-          [id: string]: Node;
-      },
-      optional: ReadonlyArray<any>
-  );
-  /**
-   * Adds a statement to this formula
-   * @param s The subject
-   * @param p The predicate
-   * @param o The object
-   * @param g The graph that contains the statement
-   */
-  add(s: Node, p: NamedNode, o: Node, g: NamedNode): number;
-  /**
-   * Adds a statement to this formula
-   * @param st The statement to add
-   */
-  addStatement(st: Statement): number;
-  /**
-   * Gets a blank node
-   * @param id The node's identifier
-   */
-  bnode(id: string): BlankNode;
-  /**
-   * Adds all the statements to this formula
-   * @param statements A collection of statements
-   */
-  addAll(statements: Iterable<Statement>): void;
-  /**
-   * Gets a node that matches the specified pattern
-   * @param s The subject
-   * @param p The predicate
-   * @param o The object
-   * @param g The graph that contains the statement
-   */
-  any(
-      s?: Node | null,
-      p?: Node | null,
-      o?: Node | null,
-      g?: Node | null
-  ): Node | null;
-  /**
-   * Gets the value of a node that matches the specified pattern
-   * @param s The subject
-   * @param p The predicate
-   * @param o The object
-   * @param g The graph that contains the statement
-   */
-  anyValue(
-      s?: Node | null,
-      p?: Node | null,
-      o?: Node | null,
-      g?: Node | null
-  ): string;
-  /**
-   * Gets the first JavaScript object equivalent to a node based on the specified pattern
-   * @param s The subject
-   * @param p The predicate
-   * @param o The object
-   * @param g The graph that contains the statement
-   */
-  anyJS(
-      s?: Node | null,
-      p?: Node | null,
-      o?: Node | null,
-      g?: Node | null
-  ): any;
-  /**
-   * Gets the first statement that matches the specified pattern
-   * @param subj The subject
-   * @param pred The predicate
-   * @param obj The object
-   * @param why The graph that contains the statement
-   */
-  anyStatementMatching(
-      subj?: Node | null,
-      pred?: Node | null,
-      obj?: Node | null,
-      why?: Node | null
-  ): Statement;
-  /**
-   * Gets the statements matching the specified pattern
-   * @param subj The subject
-   * @param pred The predicate
-   * @param obj The object
-   * @param why The graph that contains the statement
-   * @param justOne Whether to only get one statement
-   */
-  statementsMatching(
-      subj?: Node | null,
-      pred?: Node | null,
-      obj?: Node | null,
-      why?: Node | null,
-      justOne?: boolean
-  ): Statement[];
-  /**
-   * Finds the types in the list which have no *stored* subtypes
-   * These are a set of classes which provide by themselves complete
-   * information -- the other classes are redundant for those who
-   * know the class DAG.
-   * @param types A map of the types
-   */
-  bottomTypeURIs(types: {
-      [id: string]: string | NamedNode;
-  }): {
-      [id: string]: string | NamedNode;
-  };
-  /**
-   * Gets a new collection
-   */
-  collection(): Collection;
-  /**
-   * Gets each node that matches the specified pattern
-   * @param s The subject
-   * @param p The predicate
-   * @param o The object
-   * @param g The graph that contains the statement
-   */
-  each(
-      s?: Node | null,
-      p?: Node | null,
-      o?: Node | null,
-      g?: Node | null
-  ): Node[];
-  /**
-   * Gets whether this formula is equals to the other one
-   * @param other The other formula
-   */
-  equals(other: Formula): boolean;
-  /**
-   * For thisClass or any subclass, anything which has it is its type
-   * or is the object of something which has the type as its range, or subject
-   * of something which has the type as its domain
-   * We don't bother doing subproperty (yet?)as it doesn't seeem to be used
-   * much.
-   * Get all the Classes of which we can RDFS-infer the subject is a member
-   * @param thisClass A named node
-   */
-  findMembersNT(
-      thisClass: Node
-  ): {
-      [uri: string]: Statement;
-  };
-  /**
-   * For thisClass or any subclass, anything which has it is its type
-   * or is the object of something which has the type as its range, or subject
-   * of something which has the type as its domain
-   * We don't bother doing subproperty (yet?)as it doesn't seeem to be used
-   * much.
-   * Get all the Classes of which we can RDFS-infer the subject is a member
-   * @param subject A named node
-   */
-  findMemberURIs(
-      subject: Node
-  ): {
-      [uri: string]: Statement;
-  };
-  /**
-   * Get all the Classes of which we can RDFS-infer the subject is a superclass
-   * Returns a hash table where key is NT of type and value is statement why we
-   * think so.
-   * Does NOT return terms, returns URI strings.
-   * We use NT representations in this version because they handle blank nodes.
-   * @param subject A subject node
-   */
-  findSubClassesNT(
-      subject: Node
-  ): {
-      [uri: string]: boolean;
-  };
-  /**
-   * Get all the Classes of which we can RDFS-infer the subject is a subclass
-   * Returns a hash table where key is NT of type and value is statement why we
-   * think so.
-   * Does NOT return terms, returns URI strings.
-   * We use NT representations in this version because they handle blank nodes.
-   * @param subject A subject node
-   */
-  findSuperClassesNT(
-      subject: Node
-  ): {
-      [uri: string]: boolean;
-  };
-  /**
-   * Get all the Classes of which we can RDFS-infer the subject is a member
-   * todo: This will loop is there is a class subclass loop (Sublass loops are
-   * not illegal)
-   * Returns a hash table where key is NT of type and value is statement why we
-   * think so.
-   * Does NOT return terms, returns URI strings.
-   * We use NT representations in this version because they handle blank nodes.
-   * @param subject A subject node
-   */
-  findTypesNT(
-      subject: Node
-  ): {
-      [uri: string]: boolean;
-  };
-  /**
-   * Get all the Classes of which we can RDFS-infer the subject is a member
-   * todo: This will loop is there is a class subclass loop (Sublass loops are
-   * not illegal)
-   * Returns a hash table where key is NT of type and value is statement why we
-   * think so.
-   * Does NOT return terms, returns URI strings.
-   * We use NT representations in this version because they handle blank nodes.
-   * @param subject A subject node
-   */
-  findTypeURIs(
-      subject: Node
-  ): {
-      [uri: string]: boolean;
-  };
-  /**
-   * Trace the statements which connect directly, or through bnodes
-   * Returns an array of statements
-   * doc param may be null to search all documents in store
-   * @param subject A subject node
-   * @param doc A document (the graph that contains statements)
-   * @param excludePredicateURIs The predicate URIs to exclude
-   */
-  connectedStatements(
-      subject: Node,
-      doc: ValueType,
-      excludePredicateURIs: ReadonlyArray<string>
-  ): Statement[];
-  /**
-   * Creates a new empty formula - features not applicable, but necessary for typing to pass
-   */
-  formula(features?: ReadonlyArray<string>): Formula;
-  /**
-   * Transforms an NTriples string format into a Node.
-   * The bnode bit should not be used on program-external values; designed
-   * for internal work such as storing a bnode id in an HTML attribute.
-   * This will only parse the strings generated by the vaious toNT() methods.
-   * @param str A string representation
-   */
-  fromNT(str: string): Node;
-  /**
-   * Gets whether this formula holds the specified statement
-   * @param s A subject
-   * @param p A predicate
-   * @param o An object
-   * @param g A containing graph
-   */
-  holds(
-      s?: Node | null,
-      p?: Node | null,
-      o?: Node | null,
-      g?: Node | null
-  ): boolean;
-  /**
-   * Gets whether this formula holds the specified statement
-   * @param st A statement
-   */
-  holdsStatement(st: Statement): boolean;
-  /**
-   * Gets a collection from a list of values
-   * @param values The values
-   */
-  list(values: Iterable<ValueType>): Collection;
-  /**
-   * Gets a literal node
-   * @param val The literal's lexical value
-   * @param lang The language
-   * @param dt The datatype as a named node
-   */
-  literal(val: string, lang: string, dt: NamedNode): Literal;
-  /**
-   * Transform a collection of NTriple URIs into their URI strings
-   * @param t some iterable colletion of NTriple URI strings
-   * @return a collection of the URIs as strings
-   */
-  NTtoURI(t: {
-      [uri: string]: any;
-  }): {
-      [uri: string]: any;
-  };
-  /**
-   * Serializes this formula
-   * @param base The base string
-   * @param contentType The content type of the syntax to use
-   * @param provenance The provenance URI
-   */
-  serialize(base: string, contentType: string, provenance: string): string;
-  /**
-   * Gets a new formula with the substituting bindings applied
-   * @param bindings The bindings to substitute
-   */
-  substitute(bindings: Bindings): Formula;
-  /**
-   * Gets an named node for an URI
-   * @param uri The URI
-   */
-  sym(uri: string | NamedNode): NamedNode;
-  /**
-   * Gets the node matching the specified pattern
-   * @param s The subject
-   * @param p The predicate
-   * @param o The object
-   * @param g The graph that contains the statement
-   */
-  the(
-      s?: Node | null,
-      p?: Node | null,
-      o?: Node | null,
-      g?: Node | null
-  ): Node;
-  /**
-   * RDFS Inference
-   * These are hand-written implementations of a backward-chaining reasoner
-   * over the RDFS axioms.
-   * @param seeds A hash of NTs of classes to start with
-   * @param predicate The property to trace though
-   * @param inverse Trace inverse direction
-   */
-  transitiveClosure(
-      seeds: {
-          [uri: string]: boolean;
-      },
-      predicate: Node,
-      inverse: Node
-  ): {
-      [uri: string]: boolean;
-  };
-  /**
-   * Finds the types in the list which have no *stored* supertypes
-   * We exclude the universal class, owl:Things and rdf:Resource, as it is
-   * information-free.
-   * @param types The types
-   */
-  topTypeURIs(types: {
-      [id: string]: string | NamedNode;
-  }): {
-      [id: string]: string | NamedNode;
-  };
-  /**
-   * Gets the number of statements in this formulat that matches the specified pattern
-   * @param s The subject
-   * @param p The predicate
-   * @param o The object
-   * @param g The graph that contains the statement
-   */
-  whether(
-      s?: Node | null,
-      p?: Node | null,
-      o?: Node | null,
-      g?: Node | null
-  ): number;
-  /**
-   * Serializes this formulat to a string
-   */
-  toString(): string;
-  /**
-   * Gets a namespace for the specified namespace's URI
-   * @param nsuri The URI for the namespace
-   */
-  ns(nsuri: string): (ln: string) => NamedNode;
-  /**
-   * Gets a new variable
-   * @param name The variable's name
-   */
-  variable(name: string): Variable;
-  static termType: string;
-}
 
 export class Query {
          pat: IndexedFormula;
@@ -512,10 +120,7 @@ export class Query {
 * or an owl:FunctionalProperty
 */
 export class IndexedFormula extends Formula {
-  /**
-   * An UpdateManager initialised to this store
-   */
-  updater?: UpdateManager;
+
   /**
    * Creates a new formula
    * @param features The list of features to support
@@ -741,91 +346,6 @@ export class IndexedFormula extends Formula {
    */
   uris(term: NamedNode): string[];
 }
-export namespace DataFactory {
-  /**
-   * Creates a new blank node
-   * @param value The blank node's identifier
-   */
-  function blankNode(value: string): BlankNode;
-  /**
-   * Creates a new collection
-   * @param elements The initial element
-   */
-  function collection(elements: ReadonlyArray<ValueType>): Collection;
-  /**
-   * Gets the default graph
-   */
-  function defaultGraph(): DefaultGraph;
-  /**
-   * Creates a new fetcher
-   * @param store The store to use
-   * @param options The options
-   */
-  function fetcher(store: Formula, options: any): Fetcher;
-  /**
-   * Creates a new graph (store)
-   */
-  function graph(): IndexedFormula;
-  /**
-   * Creates a new literal node
-   * @param val The lexical value
-   * @param lang The language
-   * @param dt The datatype
-   */
-  function lit(val: string, lang?: string, dt?: NamedNode): Literal;
-  /**
-   * Creates a new literal node
-   * @param value The lexical value
-   * @param languageOrDatatype Either the language or the datatype
-   */
-  function literal(
-      value: string,
-      languageOrDatatype?: string | NamedNode
-  ): Literal;
-  /**
-   * Creates a new named node
-   * @param value The new named node
-   */
-  function namedNode(value: string): NamedNode;
-  /**
-   * Creates a new statement
-   * @param subject The subject
-   * @param predicate The predicate
-   * @param object The object
-   * @param graph The containing graph
-   */
-  function quad(
-      subject: Node,
-      predicate: Node,
-      object: Node,
-      graph: Node
-  ): Statement;
-  /**
-   * Creates a new statement
-   * @param subject The subject
-   * @param predicate The predicate
-   * @param object The object
-   * @param graph The containing graph
-   */
-  function st(
-      subject: Node,
-      predicate: Node,
-      object: Node,
-      graph: Node
-  ): Statement;
-  /**
-   * Creates a new statement
-   * @param subject The subject
-   * @param predicate The predicate
-   * @param object The object
-   */
-  function triple(subject: Node, predicate: Node, object: Node): Statement;
-  /**
-   * Creates a new variable
-   * @param name The name for the variable
-   */
-  function variable(name?: string): Variable;
-}
 export namespace Util {
   /**
    * Gets a named node for a media type
@@ -1008,19 +528,7 @@ export function literal(
 * @param value The new named node
 */
 export function namedNode(value: string): NamedNode;
-/**
-* Creates a new statement
-* @param subject The subject
-* @param predicate The predicate
-* @param object The object
-* @param graph The containing graph
-*/
-export function quad(
-  subject: Node,
-  predicate: Node,
-  object: Node,
-  graph: Node
-): Statement;
+
 /**
 * Creates a new statement
 * @param subject The subject
@@ -1057,35 +565,36 @@ export let NextId: number;
 * and also looking out for concurrent updates from other agents.
 */
 export class UpdateManager {
-  /**
-   * @param store The quadstore to store data and metadata. Created if not passed.
-   */
-  constructor(store?: IndexedFormula)
+    /**
+     * @param store The quadstore to store data and metadata. Created if not passed.
+     */
+    constructor(store?: IndexedFormula)
 
-  /**
-   * This is suitable for an initial creation of a document.
-   * @param document
-   * @param data
-   * @param contentType
-   * @param callback
-   */
-  put(
-      document: Node,
-      data: string | ReadonlyArray<Statement>,
-      contentType: string,
-      callback: (uri: string, ok: boolean, errorMessage: string, response?: unknown) => void,
-  ): Promise<void>;
+    /**
+     * This is suitable for an initial creation of a document.
+     * @param document
+     * @param data
+     * @param contentType
+     * @param callback
+     */
+    put(
+        document: Node,
+        data: string | ReadonlyArray<Statement>,
+        contentType: string,
+        callback: (uri: string, ok: boolean, errorMessage: string, response?: unknown) => void,
+    ): Promise<void>;
 
-  /**
-   * This high-level function updates the local store iff the web is changed successfully.
-   * Deletions, insertions may be undefined or single statements or lists or formulae (may contain bnodes which can be indirectly identified by a where clause).
-   * The `why` property of each statement must be the same and give the web document to be updated.
-   * @param statementsToDelete Statement or statements to be deleted.
-   * @param statementsToAdd Statement or statements to be inserted.
-   * @param callback
-   */
-  update(
-      statementsToDelete: ReadonlyArray<Statement>,
-      statementsToAdd: ReadonlyArray<Statement>,
-      callback: (uri: string | undefined, success: boolean, errorBody?: string) => void
-  ): void;
+    /**
+     * This high-level function updates the local store iff the web is changed successfully.
+     * Deletions, insertions may be undefined or single statements or lists or formulae (may contain bnodes which can be indirectly identified by a where clause).
+     * The `why` property of each statement must be the same and give the web document to be updated.
+     * @param statementsToDelete Statement or statements to be deleted.
+     * @param statementsToAdd Statement or statements to be inserted.
+     * @param callback
+     */
+    update(
+        statementsToDelete: ReadonlyArray<Statement>,
+        statementsToAdd: ReadonlyArray<Statement>,
+        callback: (uri: string | undefined, success: boolean, errorBody?: string) => void
+    ): void;
+}

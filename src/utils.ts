@@ -1,12 +1,12 @@
 
 import Fetcher from './fetcher';
-import { TFSomeNode, TFTerm, TFQuad, TFNamedNode, DataFactory } from './types';
+import { TFDataFactory, TFTerm, TFQuad, TFNamedNode, TFSubject } from './types';
 import { IndexedFormula } from './index';
 import { docpart } from './uri';
 import { string_startswith } from './util';
 import log from './log';
 
-export function isStatement(obj: any): obj is TFQuad {
+export function isTFStatement(obj: any): obj is TFQuad {
   return obj && Object.prototype.hasOwnProperty.call(obj, "subject")
 }
 
@@ -14,8 +14,12 @@ export function isStore(obj: any): obj is IndexedFormula {
   return obj && Object.prototype.hasOwnProperty.call(obj, "statements")
 }
 
-export function isNamedNode(obj: any): obj is TFNamedNode {
+export function isTFNamedNode(obj: any): obj is TFNamedNode {
   return obj && Object.prototype.hasOwnProperty.call(obj, "termType") && obj.termType === "NamedNode"
+}
+
+export function isTFTerm(obj: any): obj is TFTerm {
+  return obj && Object.prototype.hasOwnProperty.call(obj, "termType")
 }
 
 /**
@@ -67,7 +71,6 @@ export function AJAR_handleNewTerm (kb: { fetcher: Fetcher }, p, requestedBy) {
   return (sf as any).fetch(docuri, { referringTerm: requestedBy })
 }
 
-
 export const appliedFactoryMethods = [
   'blankNode',
   'defaultGraph',
@@ -92,13 +95,13 @@ const rdf = {
  * @return The {data} as a set of statements.
  */
 export function arrayToStatements(
-  rdfFactory: DataFactory,
-  subject: TFSomeNode,
+  rdfFactory: TFDataFactory,
+  subject: TFSubject,
   data: TFTerm[]
 ): TFQuad[] {
   const statements: TFQuad[] = []
 
-  data.reduce<TFSomeNode>((id, _listObj, i, listData) => {
+  data.reduce<TFSubject>((id, _listObj, i, listData) => {
     statements.push(rdfFactory.quad(id, rdfFactory.namedNode(rdf.first), listData[i]))
 
     let nextNode
