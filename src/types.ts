@@ -4,6 +4,7 @@ import BlankNode from './blank-node';
 import Collection from './collection';
 import Literal from './literal';
 import NamedNode from './named-node';
+import { TFNamedNode } from './types';
 
 /**
  * Types that support both Enums (for typescript) and regular strings
@@ -126,6 +127,40 @@ export interface TFDefaultGraph extends TFTerm {
 export type TFObject = TFNamedNode | TFBlankNode | TFLiteral
 
 /**
+ * RDF.js taskforce DataFactory
+ * @link https://rdf.js.org/data-model-spec/#datafactory-interface
+ */
+export interface TFDataFactory {
+  /** Returns a new instance of NamedNode. */
+  namedNode: (value: string) => TFNamedNode,
+  /**
+   * Returns a new instance of BlankNode.
+   * If the value parameter is undefined a new identifier for the
+   * blank node is generated for each call.
+   */
+  blankNode: (value?: string) => TFBlankNode,
+  /**
+   * Returns a new instance of Literal.
+   * If languageOrDatatype is a NamedNode, then it is used for the value of datatype.
+   * Otherwise languageOrDatatype is used for the value of language. */
+  literal: (value: string, languageOrDatatype: string | TFNamedNode) => TFLiteral,
+  /** Returns a new instance of Variable. This method is optional. */
+  variable?: (value: string) => TFVariable,
+  /** Returns an instance of DefaultGraph. */
+  defaultGraph: () => TFDefaultGraph,
+  /**
+   * Returns a new instance of the specific Term subclass given by original.termType
+   * (e.g., NamedNode, BlankNode, Literal, etc.),
+   * such that newObject.equals(original) returns true.
+   */
+  fromTerm: (original: TFTerm) => TFTerm
+  /**
+   * Returns a new instance of Quad, such that newObject.equals(original) returns true.
+   */
+  fromQuad: (original: TFQuad) => TFQuad
+}
+
+/**
 * A type for values that serves as inputs
 */
 export type ValueType = TFTerm | Node | Date | string | number | boolean | undefined | null | Collection;
@@ -136,6 +171,7 @@ export interface Bindings {
 
 export type TFSomeNode = TFBlankNode | TFNamedNode
 export type SubjectType = TFBlankNode | NamedNode | TFNamedNode | Variable
+export type TFPredicateType = TFNamedNode
 export type PredicateType = TFNamedNode | NamedNode | Variable
 export type ObjectType = TFObject | NamedNode | Literal | Collection | BlankNode | Variable
 export type GraphType = TFDefaultGraph | TFNamedNode | NamedNode | Variable
@@ -163,47 +199,3 @@ export enum Feature {
 }
 
 export type SupportTable = Record<Feature, boolean>
-
-/**
- * Defines a strict subset of the DataFactory as defined in the RDF/JS: Data model specification
- *
- * Non RDF-native features have been removed (e.g. no Variable, no Literal as predicate, etc.).
- *
- * bnIndex is optional but useful.
- */
-export interface DataFactory {
-  bnIndex?: number
-
-  supports: SupportTable
-
-  namedNode(value: string): TFNamedNode
-
-  blankNode(value?: string): TFBlankNode
-
-  literal(value: string, languageOrDatatype?: string | TFNamedNode): TFLiteral
-
-  literal(value: unknown): TFLiteral
-
-  defaultGraph(): TFNamedNode
-
-  quad(
-    subject: TFNamedNode | TFBlankNode | TFVariable,
-    predicate: TFNamedNode,
-    object: TFTerm,
-    graph?: TFNamedNode
-  ): TFQuad
-
-  isQuad(obj: any): obj is TFQuad
-
-  fromTerm(original: Literal | TFTerm): TFTerm
-
-  fromQuad(original: TFQuad): TFQuad
-
-  equals(a: Comparable, b: Comparable): boolean
-
-  id(obj: TFObject | TFQuad): Indexable | unknown
-
-  find?(id: Indexable | unknown): TFTerm
-
-  toNQ(term: TFTerm | TFQuad): string
-}

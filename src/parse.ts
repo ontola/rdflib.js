@@ -38,7 +38,7 @@ export default function parse (
   str: string,
   kb: Formula,
   base: string,
-  contentType?: string,
+  contentType: string,
   callback: (error: any, kb: Formula | null) => void
 ) {
   contentType = contentType || 'text/turtle'
@@ -67,6 +67,8 @@ export default function parse (
                contentType === 'application/n-quads') {
       var n3Parser = new N3jsParser({ factory: DataFactory })
       nquadCallback(null, str)
+    } else if (contentType === undefined) {
+      throw new Error("contentType is undefined")
     } else {
       throw new Error("Don't know how to parse " + contentType + ' yet')
     }
@@ -105,7 +107,7 @@ export default function parse (
       } else {
         let e2 = new Error('' + e + ' while trying to parse <' + base + '> as ' + contentType)
         e2.cause = e
-        throw e2.
+        throw e2
       }
     }
   }

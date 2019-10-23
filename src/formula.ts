@@ -8,15 +8,15 @@ import Namespace from './namespace'
 import Node from './node-internal'
 import Serializer from './serialize'
 import Statement from './statement'
-import { appliedFactoryMethods, arrayToStatements, isStatement } from './util'
+import { appliedFactoryMethods, arrayToStatements, isStatement } from './utils'
 import {
-  DataFactory,
   GraphType,
   ObjectType,
-  PredicateType,
   SubjectType,
   TFTerm,
   ValueType,
+  TFPredicateType,
+  TFDataFactory,
 } from './types'
 import Variable from './variable'
 import Literal from './literal'
@@ -26,7 +26,7 @@ export function isFormula<T>(value: T | TFTerm): value is Formula {
 }
 
 interface FormulaOpts {
-  rdfFactory?: DataFactory
+  rdfFactory?: TFDataFactory
 }
 
 /**
@@ -56,7 +56,7 @@ export default class Formula extends Node {
 
   optional: ReadonlyArray<any>
 
-  rdfFactory: DataFactory
+  rdfFactory: TFDataFactory | any
 
   /**
    * Initializes this formula
@@ -83,6 +83,7 @@ export default class Formula extends Node {
     this.initBindings = initBindings || []
     this.optional = optional || []
 
+    // TODO: Make CanonicalDataFactory comply with
     this.rdfFactory = (opts && opts.rdfFactory) || CanonicalDataFactory
     // Enable default factory methods on this while preserving factory context.
     for(const factoryMethod of appliedFactoryMethods) {
@@ -104,11 +105,12 @@ export default class Formula extends Node {
   */
   add (
     subject: SubjectType,
-    predicate: PredicateType,
+    predicate: TFPredicateType,
     object: ObjectType,
     graph?: GraphType
   ) {
-    return (this.statements as Statement[]).push(this.rdfFactory.quad(subject, predicate, object, graph))
+    return (this.statements as Statement[])
+      .push(this.rdfFactory.quad(subject, predicate, object, graph))
   }
 
   /** Add a statment object
@@ -387,7 +389,7 @@ export default class Formula extends Node {
     var len4: number
     var m: number
     var members
-    var pred
+    var pred: TFTerm
     var q: number
     var ref
     var ref1: Statement[]
@@ -448,7 +450,7 @@ export default class Formula extends Node {
    * @param subject A named node
    */
   findMemberURIs(
-    subject: TF
+    subject: Node
   ): {
       [uri: string]: Statement;
   } {
@@ -505,7 +507,7 @@ export default class Formula extends Node {
    * We use NT representations in this version because they handle blank nodes.
    */
   findTypesNT(
-    subject: Node
+    subject: TFTerm
   ): {
       [uri: string]: boolean;
   } {
@@ -564,7 +566,7 @@ export default class Formula extends Node {
    * @param subject A subject node
    */
   findTypeURIs(
-    subject: Node
+    subject: TFTerm
   ): {
       [uri: string]: boolean;
   } {
@@ -621,7 +623,7 @@ export default class Formula extends Node {
   /**
    * Creates a new empty formula - features not applicable, but necessary for typing to pass
    */
-  formula(features?: ReadonlyArray<string>): Formula {
+  formula(_features?: ReadonlyArray<string>): Formula {
     return new Formula()
   }
 
