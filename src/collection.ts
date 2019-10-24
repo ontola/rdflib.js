@@ -3,10 +3,6 @@ import ClassOrder from './class-order'
 import Node from './node-internal'
 import { ValueType, Bindings, TFTerm, CollectionTermType, TermType } from './types';
 
-export function isCollection<T>(value: T | TFTerm): value is Collection {
-  return (value as Node).termType === 'Collection'
-}
-
 /**
 * A collection of other RDF nodes
 */

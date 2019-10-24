@@ -1,10 +1,11 @@
 
 import Fetcher from './fetcher';
-import { TFDataFactory, TFTerm, TFQuad, TFNamedNode, TFSubject } from './types';
-import { IndexedFormula } from './index';
+import { TFDataFactory, TFTerm, TFQuad, TFNamedNode, TFSubject, TermType, TFLiteral } from './types';
+import { IndexedFormula, NamedNode } from './index';
 import { docpart } from './uri';
 import { string_startswith } from './util';
 import log from './log';
+import Collection from './collection';
 
 export function isTFStatement(obj: any): obj is TFQuad {
   return obj && Object.prototype.hasOwnProperty.call(obj, "subject")
@@ -20,6 +21,18 @@ export function isTFNamedNode(obj: any): obj is TFNamedNode {
 
 export function isTFTerm(obj: any): obj is TFTerm {
   return obj && Object.prototype.hasOwnProperty.call(obj, "termType")
+}
+
+export function isRDFJSDataFactory(obj: any): obj is TFTerm {
+  return obj && Object.prototype.hasOwnProperty.call(obj, "termType")
+}
+
+export function isCollection<T>(value: T | TFTerm): value is Collection {
+  return (value as TFTerm).termType === TermType.Collection
+}
+
+export function isNamedNode<T>(value: T | TFTerm): value is NamedNode {
+  return (value as TFTerm).termType === TermType.NamedNode
 }
 
 /**
@@ -102,7 +115,7 @@ export function arrayToStatements(
   const statements: TFQuad[] = []
 
   data.reduce<TFSubject>((id, _listObj, i, listData) => {
-    statements.push(rdfFactory.quad(id, rdfFactory.namedNode(rdf.first), listData[i]))
+    statements.push(rdfFactory.quad(id, rdfFactory.namedNode(rdf.first), listData[i] as TFLiteral))
 
     let nextNode
     if (i < listData.length - 1) {
@@ -118,8 +131,7 @@ export function arrayToStatements(
   return statements
 }
 
-export function ArrayIndexOf (arr, item, i) {
-  i || (i = 0)
+export function ArrayIndexOf (arr, item, i: number = 0) {
   var length = arr.length
   if (i < 0) i = length + i
   for (; i < length; i++) {
