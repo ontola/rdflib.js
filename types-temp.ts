@@ -18,40 +18,6 @@ import { NamedNode } from './src';
 // TypeScript Version: 3.0
 // Acknowledgements: This work has been financed by Logilab SA, FRANCE, logilab.fr
 
-export namespace uri {
-  /**
-   * Gets the document part of an URI
-   * @param uri The URI
-   */
-  function docpart(uri: string): string;
-  /**
-   * Gets the document part of an URI as a named node
-   * @param x The URI
-   */
-  function document(x: string): NamedNode;
-  /**
-   * Gets the hostname in an URI
-   * @param u The URI
-   */
-  function hostpart(u: string): string;
-  /**
-   * Joins an URI with a base
-   * @param given The relative part
-   * @param base The base URI
-   */
-  function join(given: string, base: string): string;
-  /**
-   * Gets the protocol part of an URI
-   * @param uri The URI
-   */
-  function protocol(uri: string): string;
-  /**
-   * Gets a relative uri
-   * @param base The base URI
-   * @param uri The absolute URI
-   */
-  function refTo(base: string, uri: string): string;
-}
 export namespace log {
   /**
    * Logs a debug event
