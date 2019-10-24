@@ -1,9 +1,9 @@
-import NamedNode, { isNamedNode } from './named-node'
+import NamedNode from './named-node'
 import Node from './node-internal'
 import XSD from './xsd-internal'
 import { ValueType, TFTerm, LiteralTermType, TFLiteral, TFNamedNode, TermType } from './types'
 import classOrder from './class-order'
-import { isTFTerm } from './utils'
+import { isTFTerm, isNamedNode } from './utils'
 
 export function isTFLiteral<T>(value: T | TFTerm): value is TFLiteral {
   return (value as TFTerm).termType === TermType.Literal
@@ -88,7 +88,8 @@ export default class Literal extends Node implements TFLiteral {
   toNT() {
     return Literal.toNT(this)
   }
-  static toNT (literal) {
+  /** Serializes a literal to an N-Triples string */
+  static toNT (literal: Literal): string {
     if (typeof literal.value === 'number') {
       return '' + literal.value
     } else if (typeof literal.value !== 'string') {
@@ -161,7 +162,7 @@ export default class Literal extends Node implements TFLiteral {
    * Builds a literal node from an input value
    * @param value The input value
    */
-  static fromValue(value: ValueType): TFTerm {
+  static fromValue(value: ValueType): Literal | TFTerm {
     if (isTFTerm(value)) {
       return value
     }

@@ -15,7 +15,7 @@ export default class NamedNode extends Node implements TFNamedNode {
   termType: NamedNodeTermType;
 
   /**
-   * Initializes this node
+   * Create a named (IRI) RDF Node
    * @param iri The IRI for this node
    */
   constructor (iri: NamedNode | string) {

@@ -3,9 +3,11 @@ import CanonicalDataFactory from './data-factory-internal'
 import Fetcher from './fetcher'
 import Literal from './literal'
 import Statement from './statement'
-import { ValueType, TFNamedNode, TFSubject, TFPredicate, TFObject, TFGraph } from './types'
+import { ValueType, TFNamedNode, TFSubject, TFPredicate, TFObject, TFGraph, SubjectType, PredicateType, ObjectType, GraphType } from './types'
 import IndexedFormula from './store'
 import Formula from './formula'
+import { DataFactory } from './data-factory-type'
+import { NamedNode } from './index'
 
 /**
  * Data factory which also supports Collections
@@ -25,8 +27,25 @@ const ExtendedTermFactory = {
   }
 }
 
+interface IRDFlibDataFactory extends DataFactory<NamedNode> {
+  fetcher: (store: Formula, options: any) => Fetcher
+  graph: (features, opts) => IndexedFormula
+  lit: (val: string, lang?: string, dt?: TFNamedNode) => Literal
+  st: (
+    subject: TFSubject,
+    predicate: TFPredicate,
+    object: TFObject,
+    graph?: TFGraph
+  ) => Statement
+  triple: (
+    subject: TFSubject,
+    predicate: TFPredicate,
+    object: TFObject
+  ) => Statement
+}
+
 /** Full RDFLib.js Data Factory */
-const DataFactory = {
+const RDFlibDataFactory: IRDFlibDataFactory = {
   ...ExtendedTermFactory,
   fetcher,
   graph,
@@ -34,7 +53,8 @@ const DataFactory = {
   st,
   triple,
 }
-export default DataFactory
+
+export default RDFlibDataFactory
 
 function id (term) {
   if (!term) {
@@ -91,12 +111,11 @@ function lit(val: string, lang?: string, dt?: TFNamedNode): Literal {
  * @param graph The containing graph
  */
 function st(
-  subject: TFSubject,
-  predicate: TFPredicate,
-  object: TFObject,
-  graph?: TFGraph
-): Statement;
-function st (subject, predicate, object, graph) {
+  subject: SubjectType,
+  predicate: PredicateType,
+  object: ObjectType,
+  graph?: GraphType
+): Statement {
   return new Statement(subject, predicate, object, graph)
 }
 /**

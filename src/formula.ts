@@ -25,13 +25,15 @@ import {
 } from './types'
 import Variable from './variable'
 import Literal from './literal'
+import { IdentityFactory, Indexable } from './data-factory-type'
+import IndexedFormula from './store'
 
 export function isFormula<T>(value: T | TFTerm): value is Formula {
   return (value as Node).termType === TermType.Graph
 }
 
 interface FormulaOpts {
-  rdfFactory?: TFDataFactory
+  rdfFactory?: IdentityFactory
 }
 
 /**
@@ -61,7 +63,7 @@ export default class Formula extends Node {
   optional: ReadonlyArray<any>
 
   /** The factory used to generate statements and terms */
-  rdfFactory: TFDataFactory
+  rdfFactory: IdentityFactory
 
   /**
    * Initializes this formula
@@ -113,7 +115,7 @@ export default class Formula extends Node {
     predicate: TFPredicate,
     object: TFObject,
     graph?: TFGraph
-  ) {
+  ): number {
     return (this.statements as Statement[])
       .push(this.rdfFactory.quad(subject, predicate, object, graph))
   }
@@ -234,7 +236,7 @@ export default class Formula extends Node {
    *
    * Falls back to the rdflib hashString implementation if the given factory doesn't support id.
    */
-  id (term: TFTerm) {
+  id (term: TFTerm): Indexable {
     return this.rdfFactory.id(term)
   }
 
@@ -718,7 +720,7 @@ fromNT(str: string): TFTerm {
     * @param context - The store
     * @return The term for the statement
     */
-  list(values: Iterable<ValueType>, context): Collection | BlankNode {
+  list(values: [], context: IndexedFormula): Collection | TFBlankNode {
     if (context.rdfFactory.supports["COLLECTIONS"]) {
       const collection = context.rdfFactory.collection()
       values.forEach(function (val) {
@@ -802,7 +804,7 @@ fromNT(str: string): TFTerm {
 
   /**
    * Gets a new formula with the substituting bindings applied
-   * @param bindings The bindings to substitute
+   * @param bindings - The bindings to substitute
    */
   substitute(bindings: Bindings): Formula {
     var statementsCopy = this.statements.map(function (ea) {
@@ -940,7 +942,7 @@ fromNT(str: string): TFTerm {
   }
 
   /**
-   * Serializes this formulat to a string
+   * Serializes this formula to a string
    */
   toString(): string {
     return '{' + this.statements.join('\n') + '}'

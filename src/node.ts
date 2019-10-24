@@ -5,8 +5,8 @@ import Collection from './collection'
 import Literal from './literal'
 import { ValueType, TFTerm } from './types'
 import Namespace from './namespace'
-import { isCollection } from './collection';
 import { isTFLiteral } from './literal';
+import { isCollection } from './utils'
 
 export default Node
 

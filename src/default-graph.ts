@@ -5,7 +5,7 @@ import { TFDefaultGraph, TermType, DefaultGraphTermType } from './types';
 * The RDF default graph
 */
 export default class DefaultGraph extends Node implements TFDefaultGraph {
-  value: ''
+  value: string
   termType: DefaultGraphTermType;
 
   constructor () {

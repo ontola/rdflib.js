@@ -13,8 +13,8 @@ import Serializer from './serializer'
 import { join as uriJoin } from './uri'
 import { isStore } from './utils'
 import * as Util from './util'
-import Node from './node';
 import Statement from './statement';
+import { NamedNode } from './index'
 
 /** Update Manager
 *
@@ -304,9 +304,9 @@ export default class UpdateManager {
    * @private
    */
   mentioned (x) {
-    return this.store.statementsMatching(x).length !== 0 || // Don't pin fresh bnodes
-      this.store.statementsMatching(undefined, x).length !== 0 ||
-      this.store.statementsMatching(undefined, undefined, x).length !== 0
+    return this.store.statementsMatching(x, null, null, null).length !== 0 || // Don't pin fresh bnodes
+      this.store.statementsMatching(null, x).length !== 0 ||
+      this.store.statementsMatching(null, null, x).length !== 0
   }
 
   /**
@@ -1018,7 +1018,7 @@ export default class UpdateManager {
      * @param callback
    */
   put(
-    document: Node,
+    doc: NamedNode,
     data: string | ReadonlyArray<Statement>,
     contentType: string,
     callback: (uri: string, ok: boolean, errorMessage: string, response?: unknown) => void,
@@ -1035,7 +1035,7 @@ export default class UpdateManager {
       })
       .then(response => {
         if (!response.ok) {
-          return callbackFunction(doc.uri, response.ok, response.error, response)
+          return callback(doc.uri, response.ok, response.error, response)
         }
 
         delete kb.fetcher.nonexistent[doc.uri]
@@ -1047,10 +1047,10 @@ export default class UpdateManager {
           })
         }
 
-        callbackFunction(doc.uri, response.ok, '', response)
+        callback(doc.uri, response.ok, '', response)
       })
       .catch(err => {
-        callbackFunction(doc.uri, false, err.message)
+        callback(doc.uri, false, err.message)
       })
   }
 

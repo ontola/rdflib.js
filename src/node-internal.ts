@@ -46,9 +46,9 @@ export default abstract class Node {
    * Gets the substituted node for this one, according to the specified bindings
    * @param bindings Bindings of identifiers to nodes
    */
-  substitute (bindings: Bindings): TFTerm {
+  substitute <T extends Node = Node>(bindings: Bindings): T {
     console.log('@@@ node substitute' + this)
-    return this
+    return this as unknown as T
   }
 
   /**

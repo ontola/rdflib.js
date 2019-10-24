@@ -26,9 +26,10 @@ import Variable from './variable'
 import { Query, indexedFormulaQuery } from './query'
 import { RDFArrayRemove } from './util';
 import UpdateManager from './update-manager';
-import { TFDataFactory, Bindings, TFTerm, TFPredicate, TFSubject, TFObject, TFGraph } from './types'
+import { TFDataFactory, Bindings, TFTerm, TFPredicate, TFSubject, TFObject, TFGraph, TFQuad, SubjectType, PredicateType, ObjectType, GraphType } from './types'
 import { NamedNode } from './index'
 import Statement from './statement';
+import { Indexable } from './data-factory-type'
 
 const owlNamespaceURI = 'http://www.w3.org/2002/07/owl#'
 
@@ -99,16 +100,21 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   /** Reverse mapping to redirection: aliases for this */
   aliases: any[]
   /** Redirections we got from HTTP */
-  HTTPRedirects: any[]
+  HTTPRedirects: TFQuad[]
   /** Array of statements with this X as subject */
-  subjectIndex: any[]
+  subjectIndex: TFQuad[]
   /** Array of statements with this X as predicate */
-  predicateIndex: any[]
+  predicateIndex: TFQuad[]
   /** Array of statements with this X as object */
-  objectIndex: any[]
+  objectIndex: TFQuad[]
   /** Array of statements with X as provenance */
-  whyIndex: any[]
-  index: any[]
+  whyIndex: TFQuad[]
+  index: [
+    TFQuad[],
+    TFQuad[],
+    TFQuad[],
+    TFQuad[]
+  ]
   features: FeaturesType
 
   /**
@@ -118,7 +124,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * @param opts
    * @param opts.rdfFactory - The data factory that should be used by the store
    */
-  constructor (features: FeaturesType, opts?: { rdfFactory: TFDataFactory}) {
+  constructor (features?: FeaturesType, opts?: { rdfFactory: TFDataFactory}) {
     super(undefined, undefined, undefined, undefined, opts)
 
     this.propertyActions = []
@@ -316,7 +322,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     subj: TFSubject,
     pred: TFPredicate,
     obj: TFObject,
-    why: TFGraph
+    why?: TFGraph
   ): Statement {
     var i
     if (arguments.length === 1) {
@@ -573,10 +579,10 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * @param graph The graph that contains the statement
    */
   match(
-    subject: TFTerm,
-    predicate: TFTerm,
-    object: TFTerm,
-    graph: TFTerm
+    subject?: TFSubject | null,
+    predicate?: TFPredicate | null,
+    object?: TFObject | null,
+    graph?: TFGraph | null
   ): Statement[] {
     return this.statementsMatching(
       Node.fromValue(subject),
@@ -744,10 +750,10 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * @param limit The number of statements to remove
    */
   removeMany(
-    subj?: Node | null,
-    pred?: Node | null,
-    obj?: Node | null,
-    why?: Node | null,
+    subj?: TFSubject | null,
+    pred?: TFPredicate | null,
+    obj?: TFObject | null,
+    why?: TFGraph | null,
     limit?: number
   ): void {
     // log.debug("entering removeMany w/ subj,pred,obj,why,limit = " + subj +", "+ pred+", " + obj+", " + why+", " + limit)
@@ -770,13 +776,14 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * @param graph The graph that contains the statement
    */
   removeMatches(
-    subject?: Node | null,
-    predicate?: Node | null,
-    object?: Node | null,
-    graph?: Node | null
+    subject?: SubjectType | null,
+    predicate?: PredicateType | null,
+    object?: ObjectType | null,
+    graph?: GraphType | null
   ): IndexedFormula {
-    this.removeStatements(this.statementsMatching(subject, predicate, object,
-      why))
+    this.removeStatements(
+      this.statementsMatching(subject, predicate, object,why)
+    )
     return this
   }
 
@@ -907,27 +914,28 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   /** Search the Store
    *
    * ALL CONVENIENCE LOOKUP FUNCTIONS RELY ON THIS!
-   * @param {Node} subject - A node to search for as subject, or if null, a wildcard
-   * @param {Node} predicate - A node to search for as predicate, or if null, a wildcard
-   * @param {Node} object - A node to search for as object, or if null, a wildcard
-   * @param {Node} graph - A node to search for as graph, or if null, a wildcard
-   * @param {Boolean} justOne - flag - stop when found one rather than get all of them?
-   * @returns {Array<Node>} - An array of nodes which match the wildcard position
+   * @param subject - A node to search for as subject, or if null, a wildcard
+   * @param predicate - A node to search for as predicate, or if null, a wildcard
+   * @param object - A node to search for as object, or if null, a wildcard
+   * @param graph - A node to search for as graph, or if null, a wildcard
+   * @param justOne - flag - stop when found one rather than get all of them?
+   * @returns An array of nodes which match the wildcard position
    */
 
   statementsMatching (
-    subj: TFTerm,
-    pred: TFTerm,
-    obj: TFTerm,
-    why: TFTerm
+    subj?: TFSubject | null,
+    pred?: TFPredicate | null,
+    obj?: TFObject | null,
+    why?: TFGraph | null,
+    justOne?: boolean
   ): Statement[] {
     // log.debug("Matching {"+subj+" "+pred+" "+obj+"}")
     var pat = [ subj, pred, obj, why ]
-    var pattern = []
-    var hash = []
-    var wild = [] // wildcards
-    var given = [] // Not wild
-    var p
+    var pattern: TFTerm[] = []
+    var hash: Indexable[] = []
+    var wild: number[] = [] // wildcards
+    var given: number[] = [] // Not wild
+    var p: number
     var list
     for (p = 0; p < 4; p++) {
       pattern[p] = this.canon(Node.fromValue(pat[p]))

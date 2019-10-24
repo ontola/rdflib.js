@@ -1,27 +1,32 @@
-import { Bindings, SubjectType, PredicateType, ObjectType, GraphType, TFQuad, TFNamedNode, SomeNode, TermType } from './types'
+import {
+  Bindings,
+  GraphType,
+  ObjectType,
+  PredicateType,
+  SubjectType,
+  TermType,
+  TFQuad,
+} from './types'
 import Literal from './literal'
 import Node from './node-internal'
-import { NamedNode, Collection, defaultGraph } from './index';
-import BlankNode from './blank-node';
-
-type StObjectType = NamedNode | Literal | Collection | BlankNode
+import { NamedNode, defaultGraph } from './index';
 
 /** A Statement represents an RDF Triple or Quad. */
-export default class Statement implements TFQuad<SomeNode, NamedNode, StObjectType, NamedNode> {
+export default class Statement implements TFQuad<SubjectType, PredicateType, ObjectType, GraphType> {
   /** The subject of the triple.  What the Statement is about. */
-  subject: SomeNode
+  subject: SubjectType
 
   /** The relationship which is asserted between the subject and object */
-  predicate: NamedNode
+  predicate: PredicateType
 
   /** The thing or data value which is asserted to be related to the subject */
-  object: StObjectType
+  object: ObjectType
 
   /**
    * The why param is a named node of the document in which the triple when
    *  it is stored on the web.
    */
-  why: TFNamedNode
+  graph: GraphType
 
   /**
    * Construct a new Triple Statment
@@ -43,26 +48,26 @@ export default class Statement implements TFQuad<SomeNode, NamedNode, StObjectTy
     subject: SubjectType,
     predicate: PredicateType,
     object: ObjectType,
-    why?: GraphType,
+    graph?: GraphType,
   ) {
-    this.subject = Node.fromValue<SomeNode>(subject)
+    this.subject = Node.fromValue(subject)
     this.predicate = Node.fromValue(predicate)
     this.object = Node.fromValue(object)
-    this.why = why as NamedNode  // property currently used by rdflib
-    if (why == undefined) {
-      this.why = defaultGraph()
+    this.graph = graph as NamedNode  // property currently used by rdflib
+    if (graph == undefined) {
+      this.graph = defaultGraph() as GraphType
     }
   }
 
   /**
    * The graph param is a named node of the document in which the triple is stored on the web.
    */
-  get graph () {
-    return this.why
+  get why () {
+    return this.graph
   }
 
-  set graph (g) {
-    this.why = g
+  set why (g) {
+    this.graph = g
   }
 
   /**
@@ -86,8 +91,9 @@ export default class Statement implements TFQuad<SomeNode, NamedNode, StObjectTy
     const y = new Statement(
       this.subject.substitute(bindings),
       this.predicate.substitute(bindings),
-      this.object.substitute(bindings) as NamedNode,
-      this.why.substitute(bindings)) // 2016
+      this.object.substitute(bindings),
+      this.why.substitute<GraphType>(bindings)
+    ) // 2016
     console.log('@@@ statement substitute:' + y)
     return y
   }

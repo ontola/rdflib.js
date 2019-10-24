@@ -3,7 +3,15 @@ import Literal from './literal'
 import NamedNode from './named-node'
 import Statement from './statement'
 import Variable from './variable'
-import { TFSubject, TFPredicate, TFObject, TFGraph, TFNamedNode } from './types'
+import {
+  TFNamedNode,
+  SubjectType,
+  PredicateType,
+  ObjectType,
+  GraphType,
+} from './types'
+import { Feature, IdentityFactory } from './data-factory-type'
+import { Node } from './index'
 
 export const defaultGraphURI = 'chrome:theSession'
 
@@ -11,14 +19,14 @@ export const defaultGraphURI = 'chrome:theSession'
  * Creates a new blank node
  * @param value The blank node's identifier
  */
-function blankNode(value: string): BlankNode {
+function blankNode(value?: string): BlankNode {
   return new BlankNode(value)
 }
 
 /**
  * Gets the default graph
  */
-function defaultGraph(): TFNamedNode {
+function defaultGraph(): NamedNode {
   return new NamedNode(defaultGraphURI)
 }
 
@@ -27,12 +35,12 @@ function defaultGraph(): TFNamedNode {
  *
  * Equivalent to {Term.hashString}
  */
-function id (term) {
+function id (term: Node) {
   if (!term) {
     return term
   }
-  if (Object.prototype.hasOwnProperty.call(term, "id") && typeof term.id === "function") {
-    return term.id()
+  if (Object.prototype.hasOwnProperty.call(term, "id") && typeof (term as NamedNode).id === "function") {
+    return (term as NamedNode).id()
   }
   if (Object.prototype.hasOwnProperty.call(term, "hashString")) {
     return term.hashString()
@@ -93,10 +101,10 @@ function namedNode(value: string): NamedNode {
 * @param graph The containing graph
 */
 function quad(
-  subject: TFSubject,
-  predicate: TFPredicate,
-  object: TFObject,
-  graph?: TFGraph
+  subject: SubjectType,
+  predicate: PredicateType,
+  object: ObjectType,
+  graph?: GraphType
 ): Statement {
   graph = graph || defaultGraph()
   return new Statement(subject, predicate, object, graph)
@@ -110,8 +118,7 @@ function variable(name?: string): Variable {
   return new Variable(name)
 }
 
-/** Contains the factory methods as defined in the spec, plus id */
-export default {
+const CanonicalDataFactory: IdentityFactory = {
   blankNode,
   defaultGraph,
   literal,
@@ -120,10 +127,14 @@ export default {
   variable,
   id,
   supports: {
-    COLLECTIONS: false,
-    DEFAULT_GRAPH_TYPE: true,
-    EQUALS_METHOD: true,
-    NODE_LOOKUP: false,
-    VARIABLE_TYPE: true,
+    [Feature.collections]: false,
+    [Feature.defaultGraphType]: true,
+    [Feature.equalsMethod]: true,
+    [Feature.identity]: true,
+    [Feature.reversibleIdentity]: false,
+    [Feature.variableType]: true,
   }
 }
+
+/** Contains the factory methods as defined in the spec, plus id */
+export default CanonicalDataFactory
