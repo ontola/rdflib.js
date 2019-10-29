@@ -27,6 +27,8 @@ New in this PR:
 - In `Formula.fromNT()` `return this.literal(str, lang || dt)` seemed wrong, converted it to
 - The various `fromValue` methods conflict with the base Node class, type wise. Since they don't use `this`, I feel like they should be converted to functions.
 - The `uri.document` function called `.uri` on a string, I removed that.
+- Transformed inline comments to JSDoc, moved them to type declarations instead of constructor.
+- Some types are set to any, because I didn't fully understand them. I've added TODO comments for these.
 
 Things I noticed:
 
@@ -37,3 +39,4 @@ Things I noticed:
 - We have a lot of names for a bunch of Statements. Graph, Document, Store, Forumula, Collection, Resource... Many of these terms have semantic
 - Aliases (e.g. `IndexedFormula.match`) introduce extra complexity, documentation and type duplication. I suggest deprecating them in a future version (1.1?) and adding deprecation warnings in the current version.
 - the `IndexedFormula` name is different from the `store` filename. I think it might be better to just call it `store` everywhere.
+- In `Fetcher`, `this.fireCallbacks` is called a few times, but it does not exist. Is this because of `callbackify`?
