@@ -129,6 +129,8 @@ interface Options {
   original?: any
   // Is this a serialized resource?
   data?: any
+  credentials?: any
+  retriedWithNoCredentials?: boolean
 }
 
 class Handler {
@@ -541,7 +543,7 @@ interface FetchCallbacks {
 }
 
 interface Nonexistent {
-  [uri: string]: string
+  [uri: string]: boolean
 }
 
 interface Lookedup {
@@ -1096,7 +1098,7 @@ export default class Fetcher {
     options: Options,
     errorMessage: string,
     statusCode: number,
-    response: Response
+    response?: Response
   ): Promise<{}> {
     this.addStatus(options.req, errorMessage)
 
@@ -1642,14 +1644,12 @@ export default class Fetcher {
   /**
    * Called when there's a network error in fetch(), or a response
    * with status of 0.
-   *
-   * @param response {Response|Error}
-   * @param docuri {string}
-   * @param options {Object}
-   *
-   * @returns {Promise}
    */
-  handleError (response, docuri, options) {
+  handleError (
+    response: Response | Error,
+    docuri: string,
+    options: Options
+  ): Promise<any> {
     if (this.isCrossSite(docuri)) {
       // Make sure we haven't retried already
       if (options.credentials && options.credentials === 'include' && !options.retriedWithNoCredentials) {
@@ -1706,12 +1706,12 @@ export default class Fetcher {
 
   /**
    * Handle fetch() response
-   *
-   * @param response {Response} fetch() response object
-   * @param docuri {string}
-   * @param options {Object}
    */
-  handleResponse (response, docuri, options) {
+  handleResponse (
+    response: Response,
+    docuri: string,
+    options: Options
+  ): Promise<string> {
     const kb = this.store
     const headers = response.headers
 
@@ -1820,12 +1820,7 @@ export default class Fetcher {
       })
   }
 
-  /**
-   * @param contentType {string}
-   *
-   * @returns {Handler|null}
-   */
-  handlerForContentType (contentType, response) {
+  handlerForContentType (contentType: string, response): Handler | null {
     if (!contentType) {
       return null
     }
@@ -1837,12 +1832,7 @@ export default class Fetcher {
     return Handler ? new Handler(response) : null
   }
 
-  /**
-   * @param uri {string}
-   *
-   * @returns {string}
-   */
-  guessContentType (uri) {
+  guessContentType (uri: string): string | undefined {
     return CONTENT_TYPE_BY_EXT[uri.split('.').pop()]
   }
 
