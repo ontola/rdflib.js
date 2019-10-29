@@ -11,22 +11,31 @@ import DataFactory from './data-factory'
 import Namespace from './namespace'
 import Serializer from './serializer'
 import { join as uriJoin } from './uri'
-import { isStore } from './utils'
+import { isStore, isNamedNode } from './utils'
 import * as Util from './util'
 import Statement from './statement';
 import { NamedNode } from './index'
 
-/** Update Manager
-*
-* The update manager is a helper object for a store.
+interface UpdateManagerFormula extends IndexedFormula {
+  fetcher: Fetcher
+}
+
+/**
+* The UpdateManager is a helper object for a store.
 * Just as a Fetcher provides the store with the ability to read and write,
 * the Update Manager provides functionality for making small patches in real time,
 * and also looking out for concurrent updates from other agents
 */
-
 export default class UpdateManager {
 
-  store: IndexedFormula
+  store: UpdateManagerFormula
+
+  ifps: {}
+
+  fps: {}
+
+  /** Index of objects for coordinating incoming and outgoing patches */
+  patchControl: []
 
   /** Object of namespaces */
   ns: any
@@ -35,14 +44,14 @@ export default class UpdateManager {
    * @param  store - The quadstore to store data and metadata. Created if not passed.
   */
   constructor (store?: IndexedFormula) {
-    store = store || new IndexedFormula() // If none provided make a store
-    this.store = (store as IndexedFormula)
+    store = store || new IndexedFormula()
     if (store.updater) {
       throw new Error("You can't have two UpdateManagers for the same store")
     }
-    if (!store.fetcher) { // The store must also/already have a fetcher
-      store.fetcher = new Fetcher(store)
+    if (!(store as UpdateManagerFormula).fetcher) {
+      (store as UpdateManagerFormula).fetcher = new Fetcher(store)
     }
+    this.store = store as UpdateManagerFormula
     store.updater = this
     this.ifps = {}
     this.fps = {}
@@ -56,7 +65,7 @@ export default class UpdateManager {
     this.ns.rdf = Namespace('http://www.w3.org/1999/02/22-rdf-syntax-ns#')
     this.ns.owl = Namespace('http://www.w3.org/2002/07/owl#')
 
-    this.patchControl = [] // index of objects fro coordinating incomng and outgoing patches
+    this.patchControl = []
   }
 
   patchControlFor (doc) {
@@ -72,20 +81,19 @@ export default class UpdateManager {
    *   for safety.
    * We don't actually check for write access on files.
    *
-   * @param uri {string}
-   * @param kb {IndexedFormula}
-   *
-   * @returns {string|boolean|undefined} The method string SPARQL or DAV or
+   * @returns The method string SPARQL or DAV or
    *   LOCALFILE or false if known, undefined if not known.
    */
-  editable (uri, kb) {
+  editable (uri: string | NamedNode, kb: IndexedFormula): string | boolean | undefined {
     if (!uri) {
       return false // Eg subject is bnode, no known doc to write to
     }
     if (!kb) {
       kb = this.store
     }
-    uri = uri.uri || uri // Allow Named Node to be passed
+    if (isNamedNode(uri)) {
+      uri = uri.uri
+    }
 
     if (uri.slice(0, 8) === 'file:///') {
       if (kb.holds(
@@ -121,7 +129,7 @@ export default class UpdateManager {
     if (kb.holds(DataFactory.namedNode(uri), this.ns.rdf('type'), this.ns.ldp('Resource'))) {
         return 'SPARQL'
     }
-    var method
+    var method: string
     for (var r = 0; r < requests.length; r++) {
       request = requests[r]
       if (request !== undefined) {
@@ -656,25 +664,21 @@ export default class UpdateManager {
     return true
   }
 
-  /** Update
-   *
-   * This high-level function updates the local store iff the web is changed
-   * successfully.
-   *
-   * Deletions, insertions may be undefined or single statements or lists or formulae
-   * (may contain bnodes which can be indirectly identified by a where clause).
-   * The `why` property of each statement must be the same and give the web document to be updated
-   *
-   * @param deletions - Statement or statments to be deleted.
-   * @param insertions - Statement or statements to be inserted
-   *
-   * @param callbackFunction {Function} called as callbackFunction(uri, success, errorbody)
-   *              OR returns a promise
-   *
-   * @returns {*}
+  /**
+   * This high-level function updates the local store iff the web is changed successfully.
+   * Deletions, insertions may be undefined or single statements or lists or formulae (may contain bnodes which can be indirectly identified by a where clause).
+   * The `why` property of each statement must be the same and give the web document to be updated.
+   * @param deletions - Statement or statements to be deleted.
+   * @param insertions - Statement or statements to be inserted.
+   * @param callback - called as callbackFunction(uri, success, errorbody)
+   *           OR returns a promise
    */
-  update (deletions, insertions, callbackFunction, secondTry) {
-    if (!callbackFunction) {
+  update(
+      deletions: ReadonlyArray<Statement>,
+      insertions: ReadonlyArray<Statement>,
+      callback?: (uri: string | undefined | null, success: boolean, errorBody?: string) => void
+  ): void | Promise<void> {
+    if (!callback) {
       var thisUpdater = this
       return new Promise(function (resolve, reject) { // Promise version
         thisUpdater.update(deletions, insertions, function (uri, ok, errorBody) {
@@ -702,7 +706,7 @@ export default class UpdateManager {
         throw new Error('Type Error ' + (typeof is) + ': ' + is)
       }
       if (ds.length === 0 && is.length === 0) {
-        return callbackFunction(null, true) // success -- nothing needed to be done.
+        return callback(null, true) // success -- nothing needed to be done.
       }
       var doc = ds.length ? ds[0].why : is[0].why
       if (!doc) {
@@ -740,7 +744,7 @@ export default class UpdateManager {
         }
         console.log(`Update: have not loaded ${doc} before: loading now...`)
         this.store.fetcher.load(doc).then(response => {
-          this.update(deletions, insertions, callbackFunction, true) // secondTry
+          this.update(deletions, insertions, callback, true) // secondTry
         }, err => {
           throw new Error(`Update: Can't read ${doc} before patching: ${err}`)
         })
@@ -809,7 +813,7 @@ export default class UpdateManager {
             }
           }
 
-          callbackFunction(uri, success, body, response)
+          callback(uri, success, body, response)
           control.pendingUpstream -= 1
           // When upstream patches have been sent, reload state if downstream waiting
           if (control.pendingUpstream === 0 && control.downstreamAction) {
@@ -820,13 +824,13 @@ export default class UpdateManager {
           }
         })
       } else if (protocol.indexOf('DAV') >= 0) {
-        this.updateDav(doc, ds, is, callbackFunction)
+        this.updateDav(doc, ds, is, callback)
       } else {
         if (protocol.indexOf('LOCALFILE') >= 0) {
           try {
-            this.updateLocalFile(doc, ds, is, callbackFunction)
+            this.updateLocalFile(doc, ds, is, callback)
           } catch (e) {
-            callbackFunction(doc.uri, false,
+            callback(doc.uri, false,
               'Exception trying to write back file <' + doc.uri + '>\n'
               // + tabulator.Util.stackString(e))
             )
@@ -836,7 +840,7 @@ export default class UpdateManager {
         }
       }
     } catch (e) {
-      callbackFunction(undefined, false, 'Exception in update: ' + e + '\n' +
+      callback(undefined, false, 'Exception in update: ' + e + '\n' +
         Util.stackString(e))
     }
   }

@@ -40,6 +40,8 @@ import serialize from './serialize'
 
 import { fetch as solidAuthCli } from 'solid-auth-cli'
 import { fetch as solidAuthClient } from 'solid-auth-client'
+import { TFBlankNode } from './types'
+import { Formula } from './index'
 
 // This is a special fetch which does OIDC auth, catching 401 errors
 const fetch = typeof window === 'undefined' ? solidAuthCli : solidAuthClient
@@ -81,6 +83,12 @@ const ns = {
 }
 
 class Handler {
+  // TODO: Document, type
+  response: any
+  // TODO: Document, type
+  dom: any
+  static pattern: RegExp
+
   constructor (response, dom) {
     this.response = response
     this.dom = dom
@@ -88,6 +96,8 @@ class Handler {
 }
 
 class RDFXMLHandler extends Handler {
+  static pattern: RegExp
+
   static toString () {
     return 'RDFXMLHandler'
   }
@@ -98,7 +108,13 @@ class RDFXMLHandler extends Handler {
     }
   }
 
-  parse (fetcher, responseText, options, response) {
+  parse (
+    fetcher: Fetcher,
+    /** An XML String */
+    responseText: String,
+    options,
+    response
+  ) {
     let kb = fetcher.store
     if (!this.dom) {
       this.dom = Util.parseXML(responseText)
@@ -427,6 +443,37 @@ function isXMLNS (responseText) {
   return responseText.match(/[^(<html)]*<html\s+[^<]*xmlns=['"]http:\/\/www.w3.org\/1999\/xhtml["'][^<]*>/)
 }
 
+interface Options {
+  fetch?: any
+  timeout?: number
+}
+
+type RequestedValues =
+  /** No record of web access or record reset */
+  undefined |
+  /** Has been requested, fetch in progress */
+  true |
+  /** Received, OK */
+  'done' |
+  /** Not logged in */
+  401 |
+  /** HTTP status unauthorized */
+  403 |
+  /** Not found, resource does not exist */
+  404 |
+  /** In attempt to counter CORS problems retried */
+  'redirected' |
+  'parse_error' |
+  /**
+   * URI is not a protocol Fetcher can deal with
+   * other strings mean various other errors.
+   */
+  'unsupported_protocol'
+
+interface Requested {
+  [uri: string]: RequestedValues
+}
+
 /** Fetcher
  *
  * The Fetcher object is a helper object for a quadstore
@@ -436,10 +483,34 @@ function isXMLNS (responseText) {
   * and put back the fata to the web.
  */
 export default class Fetcher {
+  store: Formula
+  timeout: number
+  _fetch: any
+  mediatypes: {
+    [id: string]: {
+      'q': number
+    };
+  }
+  appNode: TFBlankNode
   /**
-  * @constructor
-  */
-  constructor (store, options = {}) {
+   * this.requested[uri] states:
+   * undefined     no record of web access or records reset
+   * true          has been requested, fetch in progress
+   * 'done'        received, Ok
+   * 401           Not logged in
+   * 403           HTTP status unauthorized
+   * 404           Resource does not exist. Can be created etc.
+   * 'redirected'  In attempt to counter CORS problems retried.
+   * 'parse_error' Parse error
+   * 'unsupported_protocol'  URI is not a protocol Fetcher can deal with
+   * other strings mean various other errors.
+   */
+  requested: Requested
+
+  constructor (
+    store: Formula,
+    options: Options = {}
+  ) {
     this.store = store || new IndexedFormula()
     this.timeout = options.timeout || 30000
 
@@ -452,18 +523,6 @@ export default class Fetcher {
     this.appNode = this.store.bnode() // Denoting this session
     this.store.fetcher = this // Bi-linked
     this.requested = {}
-    // this.requested[uri] states:
-    //   undefined     no record of web access or records reset
-    //   true          has been requested, fetch in progress
-    //   'done'        received, Ok
-    //   401           Not logged in
-    //   403           HTTP status unauthorized
-    //   404           Resource does not exist. Can be created etc.
-    //   'redirected'  In attempt to counter CORS problems retried.
-    //   'parse_error' Parse error
-    //   'unsupported_protocol'  URI is not a protocol Fetcher can deal with
-    //   other strings mean various other errors.
-    //
     this.timeouts = {} // list of timeouts associated with a requested URL
     this.redirectedTo = {} // When 'redirected'
     this.fetchQueue = {}

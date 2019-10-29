@@ -27,6 +27,7 @@ import Variable from './variable'
 import Literal from './literal'
 import { IdentityFactory, Indexable } from './data-factory-type'
 import IndexedFormula from './store'
+import Fetcher from './fetcher'
 
 export function isFormula<T>(value: T | TFTerm): value is Formula {
   return (value as Node).termType === TermType.Graph
@@ -40,6 +41,8 @@ interface FormulaOpts {
  * A formula, or store of RDF statements
 */
 export default class Formula extends Node {
+  /** Is created by the Fetcher on an IndexedFormula */
+  fetcher?: Fetcher
 
   static termType: TermType.Graph;
 
