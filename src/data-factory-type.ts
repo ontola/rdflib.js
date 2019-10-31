@@ -1,4 +1,4 @@
-import { TFNamedNode, TFBlankNode, TFLiteral, TFQuad, TFTerm, TFDataFactory, TFSubject, TFObject } from "./types"
+import { TFNamedNode, TFBlankNode, TFLiteral, TFQuad, TFTerm, TFDataFactory } from "./types"
 
 /**
  * Defines a strict subset of the DataFactory as defined in the RDF/JS: Data model specification

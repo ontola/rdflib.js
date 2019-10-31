@@ -1,7 +1,7 @@
 
 import Fetcher from './fetcher';
 import { TFDataFactory, TFTerm, TFQuad, TFNamedNode, TFSubject, TermType, TFLiteral } from './types';
-import { IndexedFormula, NamedNode } from './index';
+import { IndexedFormula, NamedNode, BlankNode } from './index';
 import { docpart } from './uri';
 import { string_startswith } from './util';
 import log from './log';
@@ -18,21 +18,30 @@ export function isStore(obj: any): obj is IndexedFormula {
 export function isTFNamedNode(obj: any): obj is TFNamedNode {
   return obj && Object.prototype.hasOwnProperty.call(obj, "termType") && obj.termType === "NamedNode"
 }
+// TODO: this should only return true for actual RDFJS NamedNodes
+export function isNamedNode<T>(value: T | TFTerm): value is NamedNode {
+  return (value as TFTerm).termType === TermType.NamedNode
+}
 
 export function isTFTerm(obj: any): obj is TFTerm {
   return obj && Object.prototype.hasOwnProperty.call(obj, "termType")
 }
 
-export function isRDFJSDataFactory(obj: any): obj is TFTerm {
+export function isTFLiteral(value: any): value is TFLiteral {
+  return (value as TFTerm).termType === TermType.Literal
+}
+
+export function isCollection<T>(obj: T | TFTerm): obj is Collection {
   return obj && Object.prototype.hasOwnProperty.call(obj, "termType")
+    && (obj as TFTerm).termType === TermType.Collection
 }
 
-export function isCollection<T>(value: T | TFTerm): value is Collection {
-  return (value as TFTerm).termType === TermType.Collection
-}
-
-export function isNamedNode<T>(value: T | TFTerm): value is NamedNode {
-  return (value as TFTerm).termType === TermType.NamedNode
+/** Converts NamedNodes to URI strings */
+export function uriCreator(input: TFNamedNode | string): string {
+  if (isTFNamedNode(input)) {
+    return input.value
+  }
+  return input
 }
 
 /**

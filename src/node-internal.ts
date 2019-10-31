@@ -1,4 +1,4 @@
-import { ValueType, Bindings, TFTerm } from './types'
+import { ValueType, Bindings, TFTerm, FromValueReturns } from './types'
 import Literal from './literal'
 
 /**
@@ -37,7 +37,7 @@ export default abstract class Node {
 
   // Specified in './node.ts' to prevent circulur dependency
   // static fromValue: (value: ValueType) =>  TFTerm | Node | Literal | undefined | null
-  static fromValue: <T extends ValueType>(value: ValueType) => T
+  static fromValue: <T extends FromValueReturns>(value: ValueType) => T
 
   // Specified in './node.ts' to prevent circulur dependency
   static toJS: (term: TFTerm) => TFTerm | boolean | number | Date | string | any[]

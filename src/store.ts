@@ -20,14 +20,14 @@
 import ClassOrder from './class-order'
 import { defaultGraphURI } from './data-factory-internal'
 import Formula from './formula'
-import { ArrayIndexOf, isTFStatement, isStore } from './utils'
+import { ArrayIndexOf, isTFStatement, isStore, uriCreator } from './utils'
 import Node from './node'
 import Variable from './variable'
 import { Query, indexedFormulaQuery } from './query'
 import { RDFArrayRemove } from './util';
 import UpdateManager from './update-manager';
-import { TFDataFactory, Bindings, TFTerm, TFPredicate, TFSubject, TFObject, TFGraph, TFQuad, SubjectType, PredicateType, ObjectType, GraphType } from './types'
-import { NamedNode } from './index'
+import { TFDataFactory, Bindings, TFTerm, TFPredicate, TFSubject, TFObject, TFGraph, TFQuad, SubjectType, PredicateType, ObjectType, GraphType, TFNamedNode } from './types'
+import { NamedNode, Collection } from './index'
 import Statement from './statement';
 import { Indexable } from './data-factory-type'
 
@@ -323,7 +323,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     pred: TFPredicate,
     obj: TFObject,
     why?: TFGraph
-  ): Statement {
+  ): Statement | null {
     var i
     if (arguments.length === 1) {
       if (subj instanceof Array) {
@@ -343,7 +343,9 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
       // system generated
       why = this.fetcher ? this.fetcher.appNode : this.defaultGraph()
     }
-    subj = Node.fromValue(subj)
+    if (typeof subj == 'string') {
+      subj = new NamedNode(subj)
+    }
     pred = Node.fromValue(pred)
     obj = Node.fromValue(obj)
     why = Node.fromValue(why)
@@ -393,7 +395,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * Returns the symbol with canonical URI as smushed
    * @param term A RDF node
    */
-  canon(term: Node): Node {
+  canon(term: TFTerm): TFTerm {
     if (!term) {
       return term
     }
@@ -425,7 +427,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * @param sts The list of statements to check
    * @param from An index with the array ['subject', 'predicate', 'object', 'why']
    */
-  checkStatementList(sts: ReadonlyArray<Statement>, from: number): boolean {
+  checkStatementList(sts: ReadonlyArray<Statement>, from: number): boolean | void {
     var names = ['subject', 'predicate', 'object', 'why']
     var origin = ' found in ' + names[from] + ' index.'
     var st
@@ -466,7 +468,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     return this
   }
 
-  compareTerm(u1, u2): number {
+  compareTerm(u1: Node, u2: Node): number {
     // Keep compatibility with downstream classOrder changes
     if (Object.prototype.hasOwnProperty.call(u1, "compareTerm")) {
       return u1.compareTerm(u2)
@@ -527,7 +529,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * @param u1 The first node
    * @param u2 The second node
    */
-  equate(u1: Node, u2: Node): boolean {
+  equate(u1: TFTerm, u2: TFTerm): boolean {
     // log.warn("Equating "+u1+" and "+u2); // @@
     // @@JAMBO Must canonicalize the uris to prevent errors from a=b=c
     // 03-21-2010
@@ -551,7 +553,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * Only applicable for IndexedFormula, but TypeScript won't allow a subclass to override a property
    * @param features The list of features
    */
-  formula(features: ReadonlyArray<string>): IndexedFormula {
+  formula(features: FeaturesType): IndexedFormula {
     return new IndexedFormula(features)
   }
 
@@ -651,7 +653,8 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   }
 
   // convenience function used by N3 parser
-  variable (name) {
+  // @ts-ignore does not correctly extends from Formula
+  variable (name: string) {
     return new Variable(name)
   }
 
@@ -660,9 +663,9 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * (Note: Slow iff a lot of them -- could be O(log(k)) )
    * @param doc A document named node
    */
-  nextSymbol(doc: NamedNode): NamedNode {
+  nextSymbol(doc: TFNamedNode): TFNamedNode {
     for (var i = 0; ;i++) {
-      var uri = doc.uri + '#n' + i
+      var uri = doc.value + '#n' + i
       if (!this.mentionsURI(uri)) return this.sym(uri)
     }
   }
@@ -689,8 +692,8 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    *
    * @param myQuery The query to be run
    */
-  querySync(myQuery: Query): Bindings[] {
-    function saveBinginds (bindings) {
+  querySync(myQuery: Query): any[] {
+    function saveBinginds (bindings: Bindings) {
       results.push(bindings)
     }
     function onDone () {
@@ -708,10 +711,10 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   }
 
   /**
-   * Removes a statement from this formula
-   * @param st A statement to remove
+   * Removes one or multiple statement(s) from this formula
+   * @param st - A Statement or array of Statements to remove
    */
-  remove(st: Statement): IndexedFormula {
+  remove(st: Statement | Statement[]): IndexedFormula {
     if (st instanceof Array) {
       for (var i = 0; i < st.length; i++) {
         this.remove(st[i])
@@ -731,9 +734,9 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
 
   /**
    * Removes all statemnts in a doc
-   * @param doc The document
+   * @param doc - The document / graph
    */
-  removeDocument(doc: NamedNode): IndexedFormula {
+  removeDocument(doc: TFGraph): IndexedFormula {
     var sts = this.statementsMatching(undefined, undefined, undefined, doc).slice() // Take a copy as this is the actual index
     for (var i = 0; i < sts.length; i++) {
       this.removeStatement(sts[i])
@@ -1005,7 +1008,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * A list of all the URIs by which this thing is known
    * @param term
    */
-  uris(term: NamedNode): string[] {
+  uris(term: TFNamedNode): string[] {
     var cterm = this.canon(term)
     var terms = this.aliases[this.id(cterm)]
     if (!cterm.uri) return []

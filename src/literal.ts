@@ -3,7 +3,7 @@ import Node from './node-internal'
 import XSD from './xsd-internal'
 import { ValueType, TFTerm, LiteralTermType, TFLiteral, TFNamedNode, TermType } from './types'
 import classOrder from './class-order'
-import { isTFTerm, isNamedNode } from './utils'
+import { isNamedNode } from './utils'
 
 export function isTFLiteral<T>(value: T | TFTerm): value is TFLiteral {
   return (value as TFTerm).termType === TermType.Literal
@@ -162,21 +162,21 @@ export default class Literal extends Node implements TFLiteral {
    * Builds a literal node from an input value
    * @param value The input value
    */
-  static fromValue(value: ValueType): Literal | TFTerm {
-    if (isTFTerm(value)) {
-      return value
+  static fromValue<T extends Literal>(value: ValueType): T {
+    if (isTFLiteral(value)) {
+      return value as T
     }
     switch (typeof value) {
       case 'object':
         if (value instanceof Date) {
-          return Literal.fromDate(value)
+          return Literal.fromDate(value) as T
         }
       case 'boolean':
-        return Literal.fromBoolean(value as boolean)
+        return Literal.fromBoolean(value as boolean) as T
       case 'number':
-        return Literal.fromNumber(value)
+        return Literal.fromNumber(value as number) as T
       case 'string':
-        return new Literal(value)
+        return new Literal(value) as T
     }
     throw new Error("Can't make literal from " + value + ' of type ' +
       typeof value)

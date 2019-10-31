@@ -39,6 +39,7 @@ module.exports = (env, args) => {
                      window.solid.auth = { fetch: (a, b) => window.fetch(a, b) }
                  }`
       }),
+      // Comment out the next line if you want to disable type checking.
       new ForkTsCheckerWebpackPlugin()
     ],
     externals: {

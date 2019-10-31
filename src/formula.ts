@@ -8,7 +8,7 @@ import Namespace from './namespace'
 import Node from './node-internal'
 import Serializer from './serialize'
 import Statement from './statement'
-import { appliedFactoryMethods, arrayToStatements, isTFStatement } from './utils'
+import { appliedFactoryMethods, arrayToStatements, isTFStatement, uriCreator } from './utils'
 import {
   TFTerm,
   ValueType,
@@ -35,6 +35,10 @@ export function isFormula<T>(value: T | TFTerm): value is Formula {
 
 interface FormulaOpts {
   rdfFactory?: IdentityFactory
+}
+
+interface SeedsMap {
+  [uri: string]: boolean;
 }
 
 /**
@@ -282,7 +286,7 @@ export default class Formula extends Node {
   } {
     var bots
     var bottom
-    var elt
+    var elt: TFNamedNode
     var i
     var k
     var len
@@ -298,7 +302,7 @@ export default class Formula extends Node {
       i = 0
       for (len = subs.length; i < len; i++) {
         elt = subs[i]
-        ref = elt.uri
+        ref = elt.value
         if (ref in types) { // the subclass is one we know
           bottom = false
           break
@@ -543,7 +547,7 @@ export default class Formula extends Node {
     ref = this.statementsMatching(subject, void 0, void 0)
     for (i = 0, len = ref.length; i < len; i++) {
       st = ref[i]
-      if (st.predicate.uri === rdftype) {
+      if (st.predicate.value === rdftype) {
         types[st.object.toNT()] = st
       } else {
         ref1 = this.each(st.predicate, this.sym('http://www.w3.org/2000/01/rdf-schema#domain'))
@@ -591,12 +595,12 @@ export default class Formula extends Node {
    * @returns an array of statements, duplicate statements are suppresssed.
    */
   connectedStatements(
-    subject: Node,
+    subject: TFSubject,
     doc: TFGraph,
     excludePredicateURIs: ReadonlyArray<string>
   ): Statement[] {
     excludePredicateURIs = excludePredicateURIs || []
-    var todo: Node[] = [subject]
+    var todo: TFSubject[] = [subject]
     var done: any[] = []
     var doneArcs = []
     var result: Statement[] = []
@@ -610,8 +614,8 @@ export default class Formula extends Node {
       }
       var sts = self.statementsMatching(null, null, x, doc)
         .concat(self.statementsMatching(x, null, null, doc))
-      sts = sts.filter(function (st) {
-        if (excludePredicateURIs[st.predicate.uri]) return false
+      sts = sts.filter(function (st: Statement) {
+        if (excludePredicateURIs[st.predicate.value]) return false
         var hash = st.toNT()
         if (doneArcs[hash]) return false
         doneArcs[hash] = true
@@ -744,7 +748,11 @@ fromNT(str: string): TFTerm {
    * @param lang - The language
    * @param dt - The datatype as a named node
    */
-  literal(val: string, lang: string, dt?: NamedNode): Literal {
+  literal(
+    val: string,
+    lang?: string,
+    dt?: NamedNode
+  ): Literal {
     return new Literal('' + val, lang, dt)
   }
 
@@ -824,11 +832,12 @@ fromNT(str: string): TFTerm {
    * Gets an named node for an URI
    * @param uri The URI
    */
-  sym(uri: string | NamedNode, name?: any): NamedNode {
+  sym(uri: string | TFNamedNode, name?: any): TFNamedNode {
     if (name) {
       throw new Error('This feature (kb.sym with 2 args) is removed. Do not assume prefix mappings.')
     }
-    return this.rdfFactory.namedNode(uri)
+    const uriString = uriCreator(uri)
+    return this.rdfFactory.namedNode(uriString)
   }
 
   /**
@@ -860,9 +869,7 @@ fromNT(str: string): TFTerm {
    * @param inverse - Trace inverse direction
    */
   transitiveClosure(
-    seeds: {
-        [uri: string]: boolean;
-    },
+    seeds: SeedsMap,
     predicate: TFPredicate,
     inverse?: boolean
   ): {
@@ -911,7 +918,7 @@ fromNT(str: string): TFTerm {
       [id: string]: string | NamedNode;
   } {
     var i
-    var j
+    var j: TFNamedNode
     var k
     var len
     var n
@@ -926,7 +933,7 @@ fromNT(str: string): TFTerm {
       ref = this.each(this.sym(k), this.sym('http://www.w3.org/2000/01/rdf-schema#subClassOf'))
       for (i = 0, len = ref.length; i < len; i++) {
         j = ref[i]
-        if (j.uri !== 'http://www.w3.org/2000/01/rdf-schema#Resource') {
+        if (j.value !== 'http://www.w3.org/2000/01/rdf-schema#Resource') {
           n++
           break
         }

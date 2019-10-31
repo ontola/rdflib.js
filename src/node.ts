@@ -3,7 +3,7 @@
 import Node from './node-internal'
 import Collection from './collection'
 import Literal from './literal'
-import { ValueType, TFTerm } from './types'
+import { ValueType, TFTerm, FromValueReturns } from './types'
 import Namespace from './namespace'
 import { isTFLiteral } from './literal';
 import { isCollection } from './utils'
@@ -22,8 +22,8 @@ function isTFTerm<T>(value: T | TFTerm): value is TFTerm {
  * @method fromValue
  * @param value - Any native Javascript value
  */
-
-Node.fromValue = function <T extends ValueType>(value: ValueType): T {
+Node.fromValue = function
+<T extends FromValueReturns>(value: ValueType): T {
   if (typeof value === 'undefined' || value === null) {
     // throw new Error(`Can't make Node from ${typeof value}`)
     return value as T
@@ -34,7 +34,7 @@ Node.fromValue = function <T extends ValueType>(value: ValueType): T {
   if (Array.isArray(value)) {
     return new Collection(value) as T
   }
-  return Literal.fromValue(value) as T
+  return Literal.fromValue<T as Literal>(value) as T
 }
 
 const ns = { xsd: Namespace('http://www.w3.org/2001/XMLSchema#') }
@@ -49,7 +49,7 @@ Node.toJS = function (term: TFTerm): TFTerm | boolean | number | Date | string |
   }
   if (!isTFLiteral(term)) return term
   if (term.datatype.equals(ns.xsd('boolean'))) {
-    return term.value === '1'
+    return term.value === '1' || term.value === 'true'
   }
   if (term.datatype.equals(ns.xsd('dateTime')) ||
     term.datatype.equals(ns.xsd('date'))) {

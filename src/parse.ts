@@ -7,64 +7,50 @@ import RDFParser from './rdfxmlparser'
 import sparqlUpdateParser from './patch-parser'
 import * as Util from './util'
 import Formula from './formula';
-import { TFQuad } from './types';
-
-/**
- * Set of handled MIME types
- */
-export type mimeTypes =
-  'application/ld+json' |
-  'application/n-quads' |
-  'application/nquads' |
-  'application/rdf+xml' |
-  'application/sparql-update' |
-  'application/xhtml+xml' |
-  'text/html' |
-  'text/n3' |
-  'text/turtle'
+import { TFQuad, ContentType } from './types';
 
 /**
  * Parse a string and put the result into the graph kb.
  * Normal method is sync.
  * Unfortunately jsdonld is currently written to need to be called async.
  * Hence the mess below with executeCallback.
- * @param str The input string to parse
- * @param kb The store to use
- * @param base The base URI to use
- * @param contentType The content type for the input
- * @param callback The callback to call when the data has been loaded
+ * @param str - The input string to parse
+ * @param kb - The store to use
+ * @param base - The base URI to use
+ * @param contentType - The MIME content type string for the input
+ * @param callback - The callback to call when the data has been loaded
  */
 export default function parse (
   str: string,
   kb: Formula,
   base: string,
-  contentType: string,
-  callback: (error: any, kb: Formula | null) => void
+  contentType: string | ContentType,
+  callback?: (error: any, kb: Formula | null) => void
 ) {
-  contentType = contentType || 'text/turtle'
-  contentType = contentType.split(';')[0]
+  contentType = contentType || ContentType.turtle
+  contentType = contentType.split(';')[0] as ContentType
   try {
-    if (contentType === 'text/n3' || contentType === 'text/turtle') {
+    if (contentType === ContentType.n3 || contentType === ContentType.turtle) {
       var p = N3Parser(kb, kb, base, base, null, null, '', null)
       p.loadBuf(str)
       executeCallback()
-    } else if (contentType === 'application/rdf+xml') {
+    } else if (contentType === ContentType.rdfxml) {
       var parser = new RDFParser(kb)
       parser.parse(Util.parseXML(str), base, kb.sym(base))
       executeCallback()
-    } else if (contentType === 'application/xhtml+xml') {
-      parseRDFaDOM(Util.parseXML(str, {contentType: 'application/xhtml+xml'}), kb, base)
+    } else if (contentType === ContentType.xhtml) {
+      parseRDFaDOM(Util.parseXML(str, {contentType: ContentType.xhtml}), kb, base)
       executeCallback()
-    } else if (contentType === 'text/html') {
-      parseRDFaDOM(Util.parseXML(str, {contentType: 'text/html'}), kb, base)
+    } else if (contentType === ContentType.html) {
+      parseRDFaDOM(Util.parseXML(str, {contentType: ContentType.html}), kb, base)
       executeCallback()
-    } else if (contentType === 'application/sparql-update') { // @@ we handle a subset
+    } else if (contentType === ContentType.sparqlupdate) { // @@ we handle a subset
       sparqlUpdateParser(str, kb, base)
       executeCallback()
-    } else if (contentType === 'application/ld+json') {
+    } else if (contentType === ContentType.jsonld) {
       jsonldParser(str, kb, base, executeCallback)
-    } else if (contentType === 'application/nquads' ||
-               contentType === 'application/n-quads') {
+    } else if (contentType === ContentType.nQuads ||
+               contentType === ContentType.nQuadsAlt) {
       var n3Parser = new N3jsParser({ factory: DataFactory })
       nquadCallback(null, str)
     } else if (contentType === undefined) {
@@ -98,9 +84,9 @@ export default function parse (
 
   function executeErrorCallback (e: Error): void {
     if (
-      contentType !== 'application/ld+json' ||
-      contentType !== 'application/nquads' ||
-      contentType !== 'application/n-quads'
+      contentType !== ContentType.jsonld ||
+      contentType !== ContentType.nQuads ||
+      contentType !== ContentType.nQuadsAlt
     ) {
       if (callback) {
         callback(e, kb)
@@ -122,7 +108,7 @@ export default function parse (
     doc['@context']['@base'] = base
   }
 */
-  function nquadCallback (err, nquads) {
+  function nquadCallback (err?: Error | null, nquads?: string): void {
     if (err) {
       callback(err, kb)
     }

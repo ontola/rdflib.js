@@ -1,6 +1,7 @@
 import ClassOrder from './class-order'
 import Node from './node-internal'
 import { ValueType, TFNamedNode, TermType, NamedNodeTermType } from './types';
+import { uriCreator } from './utils';
 
 export function isNamedNode<T>(value: T | Node): value is NamedNode {
   return (value as Node).termType === TermType.NamedNode
@@ -18,13 +19,11 @@ export default class NamedNode extends Node implements TFNamedNode {
    * Create a named (IRI) RDF Node
    * @param iri The IRI for this node
    */
-  constructor (iri: NamedNode | string) {
+  constructor (iriIn: TFNamedNode | string) {
     super()
     this.termType = TermType.NamedNode
 
-    if (iri && (iri as NamedNode).termType === NamedNode.termType) {  // param is a named node
-      iri = (iri as NamedNode).value
-    }
+    const iri = uriCreator(iriIn)
 
     if (!iri) {
       throw new Error('Missing IRI for NamedNode')
@@ -48,7 +47,7 @@ export default class NamedNode extends Node implements TFNamedNode {
    * Returns an RDF node for the containing directory, ending in slash.
    */
   dir (): NamedNode | null{
-     var str = this.uri.split('#')[0]
+     var str = this.value.split('#')[0]
      var p = str.slice(0, -1).lastIndexOf('/')
      var q = str.indexOf('//')
      if ((q >= 0 && p < q + 2) || p < 0) return null
@@ -60,7 +59,7 @@ export default class NamedNode extends Node implements TFNamedNode {
    * Contrast with the "origin" which does NOT have a trailing slash
    */
   site (): NamedNode {
-     var str = this.uri.split('#')[0]
+     var str = this.value.split('#')[0]
      var p = str.indexOf('//')
      if (p < 0) throw new Error('This URI does not have a web site part (origin)')
      var q = str.indexOf('/', p+2)
@@ -98,6 +97,7 @@ export default class NamedNode extends Node implements TFNamedNode {
 
   /**
    * Legacy getter and setter alias, node.uri
+   * @deprecated use .value
    */
   get uri (): string {
     return this.value

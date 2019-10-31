@@ -39,6 +39,9 @@ export enum ContentType {
   nQuads = "application/n-quads",
   nQuadsAlt = "application/nquads",
   jsonld = "application/ld+json",
+  xhtml = "application/xhtml+xml",
+  html = "text/html",
+  sparqlupdate = "application/sparql-update",
 }
 
 /** A type for values that serves as inputs */
@@ -213,10 +216,13 @@ export interface Bindings {
 }
 
 /** A RDF/JS taskforce Subject */
-export type TFSubject = TFNamedNode | TFBlankNode | TFVariable
+export type TFSubject = TFNamedNode | TFBlankNode // | TFVariable
 /** A RDF/JS taskforce Predicate */
-export type TFPredicate = TFNamedNode | TFVariable
+export type TFPredicate = TFNamedNode // | TFVariable
 /** A RDF/JS taskforce Object */
-export type TFObject = TFNamedNode | TFBlankNode | TFLiteral | TFVariable
+export type TFObject = TFNamedNode | TFBlankNode | TFLiteral  // | TFVariable
 /** A RDF/JS taskforce Graph */
-export type TFGraph = TFNamedNode | TFDefaultGraph | TFBlankNode | TFVariable
+export type TFGraph = TFNamedNode | TFDefaultGraph | TFBlankNode  // | TFVariable
+
+/** All the types that a .fromValue() method might return */
+export type FromValueReturns = TFTerm | undefined | null | Collection
