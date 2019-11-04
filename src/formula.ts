@@ -8,12 +8,10 @@ import Namespace from './namespace'
 import Node from './node-internal'
 import Serializer from './serialize'
 import Statement from './statement'
-import { appliedFactoryMethods, arrayToStatements, isTFStatement, uriCreator } from './utils'
+import { appliedFactoryMethods, arrayToStatements, isTFStatement, uriCreator, isStatement } from './utils'
 import {
   TFTerm,
-  ValueType,
   TFPredicate,
-  TFDataFactory,
   Bindings,
   TFNamedNode,
   TFSubject,
@@ -22,10 +20,12 @@ import {
   TFQuad,
   TermType,
   TFBlankNode,
+  TFDataFactory,
+  TFLiteral,
 } from './types'
 import Variable from './variable'
 import Literal from './literal'
-import { IdentityFactory, Indexable } from './data-factory-type'
+import { IdentityFactory, Indexable, DataFactory, TFIDFactoryTypes } from './data-factory-type'
 import IndexedFormula from './store'
 import Fetcher from './fetcher'
 
@@ -33,8 +33,8 @@ export function isFormula<T>(value: T | TFTerm): value is Formula {
   return (value as Node).termType === TermType.Graph
 }
 
-interface FormulaOpts {
-  rdfFactory?: IdentityFactory
+export interface FormulaOpts {
+  rdfFactory?: IdentityFactory & DataFactory
 }
 
 interface SeedsMap {
@@ -53,7 +53,7 @@ export default class Formula extends Node {
   /**
    * The stored statements
    */
-  statements: Statement[];
+  statements: TFQuad[];
 
   /**
    * The additional constraints
@@ -70,7 +70,7 @@ export default class Formula extends Node {
   optional: ReadonlyArray<any>
 
   /** The factory used to generate statements and terms */
-  rdfFactory: IdentityFactory
+  rdfFactory: IdentityFactory & (TFDataFactory | DataFactory)
 
   /**
    * Initializes this formula
@@ -82,7 +82,7 @@ export default class Formula extends Node {
    * @param opts.rdfFactory - The rdf factory that should be used by the store
    */
   constructor(
-    statements?: Statement[],
+    statements?: TFQuad[],
     constraints?: ReadonlyArray<any>,
     initBindings?: {
         [id: string]: Node;
@@ -123,7 +123,7 @@ export default class Formula extends Node {
     object: TFObject,
     graph?: TFGraph
   ): number {
-    return (this.statements as Statement[])
+    return (this.statements as TFQuad[])
       .push(this.rdfFactory.quad(subject, predicate, object, graph))
   }
 
@@ -230,7 +230,7 @@ export default class Formula extends Node {
     p?: TFPredicate | null,
     o?: TFObject | null,
     g?: TFGraph | null
-  ): Statement | undefined {
+  ): TFQuad | undefined {
     var x = this.statementsMatching(s, p, o, g)
     if (!x || x.length === 0) {
       return undefined
@@ -243,7 +243,7 @@ export default class Formula extends Node {
    *
    * Falls back to the rdflib hashString implementation if the given factory doesn't support id.
    */
-  id (term: TFTerm): Indexable {
+  id (term: TFIDFactoryTypes): Indexable {
     return this.rdfFactory.id(term)
   }
 
@@ -262,7 +262,7 @@ export default class Formula extends Node {
     p?: TFPredicate | null,
     o?: TFObject | null,
     g?: TFGraph | null
-    ): Statement[] {
+    ): TFQuad[] {
     let found = this.statements.filter(st =>
       (!s || s.equals(st.subject)) &&
       (!p || p.equals(st.predicate)) &&
@@ -340,7 +340,7 @@ export default class Formula extends Node {
     o?: TFObject | null,
     g?: TFGraph | null
   ): TFTerm[] {
-    var elt: Statement, i: number, l: number, m: number, q: number
+    var elt: TFQuad, i: number, l: number, m: number, q: number
     var len: number, len1: number, len2: number, len3: number
     var results: TFTerm[] = []
     var sts = this.statementsMatching(s, p, o, g)
@@ -362,7 +362,7 @@ export default class Formula extends Node {
     } else if (g == null) {
       for (q = 0, len3 = sts.length; q < len3; q++) {
         elt = sts[q]
-        results.push(elt.why)
+        results.push(elt.graph)
       }
     }
     return results
@@ -392,7 +392,7 @@ export default class Formula extends Node {
   findMembersNT(
     thisClass: Node
   ): {
-      [uri: string]: Statement;
+      [uri: string]: TFQuad;
   } {
     var i: number
     var l: number
@@ -406,11 +406,11 @@ export default class Formula extends Node {
     var pred: TFTerm
     var q: number
     var ref
-    var ref1: Statement[]
+    var ref1: TFQuad[]
     var ref2: TFTerm[]
-    var ref3: Statement[]
+    var ref3: TFQuad[]
     var ref4: TFTerm[]
-    var ref5: Statement[]
+    var ref5: TFQuad[]
     var seeds
     var st
     var t
@@ -544,7 +544,7 @@ export default class Formula extends Node {
     var types
     rdftype = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
     types = []
-    ref = this.statementsMatching(subject, void 0, void 0)
+    ref = this.statementsMatching(subject, void 0, void 0) as Statement[]
     for (i = 0, len = ref.length; i < len; i++) {
       st = ref[i]
       if (st.predicate.value === rdftype) {
@@ -557,7 +557,7 @@ export default class Formula extends Node {
         }
       }
     }
-    ref2 = this.statementsMatching(void 0, void 0, subject)
+    ref2 = this.statementsMatching(void 0, void 0, subject) as Statement[]
     for (m = 0, len2 = ref2.length; m < len2; m++) {
       st = ref2[m]
       ref3 = this.each(st.predicate, this.sym('http://www.w3.org/2000/01/rdf-schema#range'))
@@ -648,7 +648,7 @@ export default class Formula extends Node {
    * This will only parse the strings generated by the vaious toNT() methods.
    * @param str A string representation
    */
-fromNT(str: string): TFTerm {
+  fromNT(str: string): TFLiteral | TFBlankNode | TFNamedNode | Variable {
     var dt: TFNamedNode | undefined, k: number, lang: string | undefined
     switch (str[0]) {
       case '<':
@@ -705,7 +705,7 @@ fromNT(str: string): TFTerm {
         }
         return true
       } else if (isTFStatement(s)) {
-        return this.holds(s.subject, s.predicate, s.object, s.why)
+        return this.holds(s.subject, s.predicate, s.object, s.graph)
       }
     }
 
@@ -717,8 +717,8 @@ fromNT(str: string): TFTerm {
    * Gets whether this formula holds the specified statement
    * @param st A statement
    */
-  holdsStatement(st: Statement): boolean {
-    return this.holds(st.subject, st.predicate, st.object, st.why)
+  holdsStatement(st: TFQuad): boolean {
+    return this.holds(st.subject, st.predicate, st.object, st.graph)
   }
 
   /**
@@ -729,6 +729,7 @@ fromNT(str: string): TFTerm {
     */
   list(values: [], context: IndexedFormula): Collection | TFBlankNode {
     if (context.rdfFactory.supports["COLLECTIONS"]) {
+      //@ts-ignore if a rdfFactory supports collections, the collection() method should work
       const collection = context.rdfFactory.collection()
       values.forEach(function (val) {
         collection.append(val)
@@ -751,7 +752,7 @@ fromNT(str: string): TFTerm {
   literal(
     val: string,
     lang?: string,
-    dt?: NamedNode
+    dt?: TFNamedNode
   ): Literal {
     return new Literal('' + val, lang, dt)
   }
@@ -763,9 +764,9 @@ fromNT(str: string): TFTerm {
    * todo: explain why it is important to go through NT
    */
   NTtoURI(t: {
-    [uri: string]: any;
+    [uri: string]: string;
   }): {
-    [uri: string]: any;
+    [uri: string]: string;
   }{
     var k, v
     var uris = {}
@@ -781,13 +782,13 @@ fromNT(str: string): TFTerm {
 
   /**
    * Serializes this formula
-   * @param base The base string
-   * @param contentType The content type of the syntax to use
-   * @param provenance The provenance URI
+   * @param base - The base string
+   * @param contentType - The content type of the syntax to use
+   * @param provenance - The provenance URI
    */
   serialize(base: string, contentType: string, provenance: string): string {
     var documentString
-    var sts: Statement[]
+    var sts: TFQuad[]
     var sz
     sz = Serializer(this)
     sz.suggestNamespaces(this.namespaces)
@@ -817,12 +818,14 @@ fromNT(str: string): TFTerm {
    * Gets a new formula with the substituting bindings applied
    * @param bindings - The bindings to substitute
    */
+  //@ts-ignore signature not compatible with Node
   substitute(bindings: Bindings): Formula {
     var statementsCopy = this.statements.map(function (ea) {
-      return ea.substitute(bindings)
+      return (ea as Statement).substitute(bindings)
     })
     console.log('Formula subs statmnts:' + statementsCopy)
     var y = new Formula()
+    // This will throw an error, since this.add() can't handle
     y.add(statementsCopy)
     console.log('indexed-form subs formula:' + y)
     return y

@@ -7,7 +7,7 @@ import RDFParser from './rdfxmlparser'
 import sparqlUpdateParser from './patch-parser'
 import * as Util from './util'
 import Formula from './formula';
-import { TFQuad, ContentType } from './types';
+import { TFQuad, ContentType, ContentTypes } from './types';
 
 /**
  * Parse a string and put the result into the graph kb.
@@ -24,11 +24,11 @@ export default function parse (
   str: string,
   kb: Formula,
   base: string,
-  contentType: string | ContentType,
+  contentType: string | ContentTypes,
   callback?: (error: any, kb: Formula | null) => void
 ) {
   contentType = contentType || ContentType.turtle
-  contentType = contentType.split(';')[0] as ContentType
+  contentType = contentType.split(';')[0] as ContentTypes
   try {
     if (contentType === ContentType.n3 || contentType === ContentType.turtle) {
       var p = N3Parser(kb, kb, base, base, null, null, '', null)
@@ -92,6 +92,7 @@ export default function parse (
         callback(e, kb)
       } else {
         let e2 = new Error('' + e + ' while trying to parse <' + base + '> as ' + contentType)
+        //@ts-ignore .cause is not a default error property
         e2.cause = e
         throw e2
       }

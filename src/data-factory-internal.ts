@@ -9,8 +9,10 @@ import {
   PredicateType,
   ObjectType,
   GraphType,
+  TermType,
+  TFDataFactory,
 } from './types'
-import { Feature, IdentityFactory } from './data-factory-type'
+import { Feature, IdentityFactory, Indexable } from './data-factory-type'
 import { Node } from './index'
 
 export const defaultGraphURI = 'chrome:theSession'
@@ -35,7 +37,7 @@ function defaultGraph(): NamedNode {
  *
  * Equivalent to {Term.hashString}
  */
-function id (term: Node) {
+function id (term: Node): string | undefined {
   if (!term) {
     return term
   }
@@ -47,13 +49,13 @@ function id (term: Node) {
   }
 
   switch (term.termType) {
-    case "NamedNode":
+    case TermType.NamedNode:
       return '<' + term.value + '>'
-    case "BlankNode":
+    case TermType.BlankNode:
       return '_:' + term.value
-    case "Literal":
-      return Literal.toNT(term)
-    case "Variable":
+    case TermType.Literal:
+      return Literal.toNT(term as Literal)
+    case TermType.Variable:
       return Variable.toString(term)
     default:
       return undefined
@@ -118,7 +120,21 @@ function variable(name?: string): Variable {
   return new Variable(name)
 }
 
-const CanonicalDataFactory: IdentityFactory = {
+const CanonicalDataFactory: TFDataFactory<
+  NamedNode,
+  BlankNode,
+  Literal,
+  SubjectType,
+  PredicateType,
+  ObjectType,
+  GraphType,
+  // DefaultGraph is:
+  NamedNode | BlankNode,
+  Statement
+> & IdentityFactory <
+  Statement,
+  NamedNode | BlankNode | Literal | Variable
+> = {
   blankNode,
   defaultGraph,
   literal,

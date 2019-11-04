@@ -36,6 +36,7 @@ New in this PR:
 - Removed unused second argument from `Fetcher.cleanupFetchRequest`
 - Created one huge `Options` type for Fetcher. Not sure if this is the way to go.
 - In `Node.toJS`, the boolean only returned true if the `xsd:boolean` value is `'1'`, now it it should also work for `'true'`.
+- Added typechecks for valid statements, e.g. `isTFPredicate`.
 
 Things I noticed:
 
@@ -50,8 +51,11 @@ Things I noticed:
 - The Variable type (or `TFVariable`) really messes with some assumptions. I feel like they should not be valid in regular quads, since it's impossible to serialize them decently.
 - Many promise functions could be converted to async.
 - The `Fetcher` `StatusValues` should be `numbers`, but can be many types in RDFlib. This breaks compatibility with extending Response types. I feel we should only use the `499` browser error and add the message to the `requestbody`
-- `store.add()` accepts many types of inputs, but this will lead to invalid statements (e.g. a Literal as a Subject). I suggest we make this more strict and throw more errors on wrong inputs. Relates to #362. We could still make the allowed inputs bigger by allowing other types with some explicit behavior, e.g. in subject arguments, create `NamedNodes` from `URL` objects and `strings` that look like URLs . In any case, I thinkg the `Node.formValue` behavior is too unpredictable for `store.add`.
+- `store.add()` accepts many types of inputs, but this will lead to invalid statements (e.g. a Literal as a Subject). I suggest we make this more strict and throw more errors on wrong inputs. Relates to #362. We could still make the allowed inputs bigger by allowing other types with some explicit behavior, e.g. in subject arguments, create `NamedNodes` from `URL` objects and `strings` that look like URLs . In any case, I thinkg the `Node.formValue` behavior is too unpredictable for `store.add`. For now, I've updated the docs to match its behavior.
 - I'm a bit embarassed about this, but even after rewriting so much of the code I still don't understand all methods. E.g. `Forumla.transitiveClosure()`
 - The `IndexedFormula` and `Formula` methods have incompatible types, such as in `compareTerm`, `variable` and `add`. This
 - The concept `graph` is referred to as `why`, `doc` and `graph` in the code and API. I think this might be confusing - we should just call it graph.
-- THe `Parse.executeErrorCallback` conditional logic is always `true`.
+- The `Parse.executeErrorCallback` conditional logic is always `true`.
+- The `Formula.serialize` function calls `serialize.ts` with only one argument, so without a store. I think this will crash every time, maybe it's rotten code?
+- `Formula.substitute()` uses `this.add(Statments[])`, which will crash. I think it should be removed, since `IndexedFormula.substitute` is used all the time anyway.
+- `IndexedFormula.predicateCallback` is checked, but never used in this codebase.

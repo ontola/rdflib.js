@@ -1,7 +1,7 @@
 
 import Fetcher from './fetcher';
-import { TFDataFactory, TFTerm, TFQuad, TFNamedNode, TFSubject, TermType, TFLiteral } from './types';
-import { IndexedFormula, NamedNode, BlankNode } from './index';
+import { TFDataFactory, TFTerm, TFQuad, TFNamedNode, TFSubject, TermType, TFLiteral, TFPredicate, TFObject, TFGraph } from './types';
+import { IndexedFormula, NamedNode, Statement } from './index';
 import { docpart } from './uri';
 import { string_startswith } from './util';
 import log from './log';
@@ -9,6 +9,10 @@ import Collection from './collection';
 
 export function isTFStatement(obj: any): obj is TFQuad {
   return obj && Object.prototype.hasOwnProperty.call(obj, "subject")
+}
+
+export function isStatement(obj: any): obj is Statement {
+  return obj && obj instanceof Statement
 }
 
 export function isStore(obj: any): obj is IndexedFormula {
@@ -34,6 +38,35 @@ export function isTFLiteral(value: any): value is TFLiteral {
 export function isCollection<T>(obj: T | TFTerm): obj is Collection {
   return obj && Object.prototype.hasOwnProperty.call(obj, "termType")
     && (obj as TFTerm).termType === TermType.Collection
+}
+
+export function isTFSubject(obj: any): obj is TFSubject {
+  return obj && Object.prototype.hasOwnProperty.call(obj, "termType") && (
+    obj.termType === TermType.NamedNode ||
+    obj.termType === TermType.BlankNode
+  )
+}
+
+export function isTFPredicate(obj: any): obj is TFPredicate {
+  return obj && Object.prototype.hasOwnProperty.call(obj, "termType") && (
+    obj.termType === TermType.NamedNode
+  )
+}
+
+export function isTFObject(obj: any): obj is TFObject {
+  return obj && Object.prototype.hasOwnProperty.call(obj, "termType") && (
+    obj.termType === TermType.NamedNode ||
+    obj.termType === TermType.BlankNode ||
+    obj.termType === TermType.Literal
+  )
+}
+
+export function isTFGraph(obj: any): obj is TFGraph {
+  return obj && Object.prototype.hasOwnProperty.call(obj, "termType") && (
+    obj.termType === TermType.NamedNode ||
+    obj.termType === TermType.BlankNode ||
+    obj.termType === TermType.DefaultGraph
+  )
 }
 
 /** Converts NamedNodes to URI strings */

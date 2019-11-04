@@ -1,4 +1,4 @@
-import { TFNamedNode, TFBlankNode, TFLiteral, TFQuad, TFTerm, TFDataFactory } from "./types"
+import { TFNamedNode, TFBlankNode, TFLiteral, TFQuad, TFTerm, TFDataFactory, TFDefaultGraph, TFSubject, TFPredicate, TFObject, TFGraph } from "./types"
 
 /**
  * Defines a strict subset of the DataFactory as defined in the RDF/JS: Data model specification
@@ -9,8 +9,28 @@ export interface DataFactory<
   NamedNode extends TFNamedNode = TFNamedNode,
   BlankNode extends TFBlankNode = TFBlankNode,
   Literal extends TFLiteral = TFLiteral,
-  FactoryTypes = NamedNode | TFBlankNode | Literal | TFQuad
-> extends TFDataFactory {
+  Quad = TFQuad,
+  FactoryTypes = NamedNode | TFBlankNode | Literal | Quad,
+  Subject = TFSubject,
+  Predicate = TFPredicate,
+  Object = TFObject,
+  Graph = TFGraph,
+  DefaultGraph = NamedNode | BlankNode,
+> extends TFDataFactory<
+  NamedNode,
+  BlankNode,
+  Literal,
+  Subject,
+  Predicate,
+  Object,
+  Graph,
+  DefaultGraph,
+  Quad
+> {
+  /**
+   * BlankNode index
+   * @private
+  */
   bnIndex?: number
 
   supports: SupportTable
@@ -19,30 +39,20 @@ export interface DataFactory<
 
   literal(value: unknown): Literal
 
-  defaultGraph(): NamedNode | BlankNode
-
-  quad(
-    subject: NamedNode | BlankNode,
-    predicate: NamedNode,
-    object: NamedNode | BlankNode | Literal,
-    graph?: NamedNode
-  ): TFQuad
-
-  isQuad(obj: any): obj is TFQuad
-
-  fromTerm(original: Literal | TFTerm): TFTerm
-
-  fromQuad(original: TFQuad): TFQuad
+  isQuad(obj: any): obj is Quad
 
   equals(a: Comparable, b: Comparable): boolean
 
   toNQ(term: FactoryTypes): string
 }
 
+export type TFIDFactoryTypes = TFNamedNode | TFBlankNode | TFLiteral | TFQuad
+
 export interface IdentityFactory<
+  Quad = TFQuad,
+  IDFactoryTypes = TFNamedNode | TFBlankNode | TFLiteral | Quad,
   IndexType = Indexable,
-  FactoryTypes = TFNamedNode | TFBlankNode | TFLiteral | TFQuad
-> extends DataFactory<FactoryTypes> {
+> {
   /**
    * Generates a unique session-idempotent identifier for the given object.
    *
@@ -51,8 +61,7 @@ export interface IdentityFactory<
    *
    * @return {Indexable} A unique value which must also be a valid JS object key type.
    */
-  id(obj: FactoryTypes): IndexType | unknown
-
+  id(obj: IDFactoryTypes): IndexType
 }
 
 /**
@@ -65,7 +74,7 @@ export interface IdentityFactory<
 export interface ReversibleIdentityFactory<
   IndexType = Indexable,
   FactoryTypes = TFNamedNode | TFBlankNode | TFLiteral | TFQuad
-> extends IdentityFactory<FactoryTypes> {
+> extends IdentityFactory<Indexable, FactoryTypes> {
   fromId(id: IndexType): FactoryTypes;
 }
 

@@ -19,8 +19,8 @@
 
 import ClassOrder from './class-order'
 import { defaultGraphURI } from './data-factory-internal'
-import Formula from './formula'
-import { ArrayIndexOf, isTFStatement, isStore, uriCreator } from './utils'
+import Formula, { FormulaOpts } from './formula'
+import { ArrayIndexOf, isTFStatement, isStore, uriCreator, isTFSubject, isTFPredicate, isTFObject, isTFGraph } from './utils'
 import Node from './node'
 import Variable from './variable'
 import { Query, indexedFormulaQuery } from './query'
@@ -60,9 +60,16 @@ function handleIFP (formula, subj, pred, obj) {
   return true
 } // handleIFP
 
-function handleRDFType (formula, subj, pred, obj, why) {
+function handleRDFType (
+  formula: IndexedFormula,
+  subj: SubjectType,
+  pred: PredicateType,
+  obj: ObjectType,
+  why: GraphType
+) {
+  //@ts-ignore this method does not seem to exist in this library
   if (formula.typeCallback) {
-    formula.typeCallback(formula, obj, why)
+    (formula as any).typeCallback(formula, obj, why)
   }
 
   var x = formula.classActions[formula.id(obj)]
@@ -89,8 +96,6 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    */
   namespaces: {[key: string]: string}
 
-  handleRDFType?: () => any
-
   /** Array of functions to call when adding { s type X } */
   classActions: Function[]
   /** Array of functions to call when getting statement with {s X o} */
@@ -116,6 +121,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     TFQuad[]
   ]
   features: FeaturesType
+  static handleRDFType: Function
 
   /**
    * Creates a new formula
@@ -124,7 +130,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * @param opts
    * @param opts.rdfFactory - The data factory that should be used by the store
    */
-  constructor (features?: FeaturesType, opts?: { rdfFactory: TFDataFactory}) {
+  constructor (features?: FeaturesType, opts?: FormulaOpts) {
     super(undefined, undefined, undefined, undefined, opts)
 
     this.propertyActions = []
@@ -163,6 +169,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * Gets this graph with the bindings substituted
    * @param bindings The bindings
    */
+  //@ts-ignore different from signature in Formula
   substitute(bindings: Bindings): IndexedFormula {
     var statementsCopy = this.statements.map(function (ea) {
       return ea.substitute(bindings)
@@ -312,33 +319,35 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   /**
    * Adds a triple (quad) to the store.
    *
-   * @param subject - The thing about which the fact a relationship is asserted
-   * @param predicate - The relationship which is asserted
-   * @param object - The object of the relationship, e.g. another thing or avalue
+   * @param subj - The thing about which the fact a relationship is asserted.
+   *        Also accepts a statement or an array of Statements.
+   * @param pred - The relationship which is asserted
+   * @param obj - The object of the relationship, e.g. another thing or avalue
    * @param why - The document in which the triple (S,P,O) was or will be stored on the web
-   * @returns The statement added to the store
+   * @returns The statement added to the store, or the store
    */
+  //@ts-ignore differs from signature in Formula
   add (
-    subj: TFSubject,
-    pred: TFPredicate,
-    obj: TFObject,
+    subj: TFSubject | Statement | TFQuad[],
+    pred?: TFPredicate,
+    obj?: TFObject,
     why?: TFGraph
-  ): Statement | null {
-    var i
+  ): TFQuad | null | IndexedFormula {
+    var i: number
     if (arguments.length === 1) {
       if (subj instanceof Array) {
         for (i = 0; i < subj.length; i++) {
           this.add(subj[i])
         }
       } else if (isTFStatement(subj)) {
-        this.add(subj.subject, subj.predicate, subj.object, subj.why)
+        this.add(subj.subject, subj.predicate, subj.object, subj.graph)
       } else if (isStore(subj)) {
         this.add(subj.statements)
       }
       return this
     }
-    var actions
-    var st
+    var actions: Function[]
+    var st: TFQuad
     if (!why) {
       // system generated
       why = this.fetcher ? this.fetcher.appNode : this.defaultGraph()
@@ -349,7 +358,21 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     pred = Node.fromValue(pred)
     obj = Node.fromValue(obj)
     why = Node.fromValue(why)
+    if (!isTFSubject(subj)) {
+      throw "Subject is not a subject type"
+    }
+    if (!isTFPredicate(pred)) {
+      throw "Predicate is not a predicate type"
+    }
+    if (!isTFObject(obj)) {
+      throw "Predicate is not a predicate type"
+    }
+    if (!isTFGraph(why)) {
+      throw "Why is not a graph type"
+    }
+    //@ts-ignore This is not used internally
     if (this.predicateCallback) {
+      //@ts-ignore This is not used internally
       this.predicateCallback(this, pred, why)
     }
     // Action return true if the statement does not need to be added
@@ -371,10 +394,10 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     // Don't put it in the store
     // still return this statement for owl:sameAs input
     var hash = [
-      this.id(this.canon(subj)),
+      this.id(this.canon(subj as TFSubject)),
       predHash,
-      this.id(this.canon(obj)),
-      this.id(this.canon(why))
+      this.id(this.canon(obj as TFObject)),
+      this.id(this.canon(why as TFGraph))
     ]
     st = this.rdfFactory.quad(subj, pred, obj, why)
     for (i = 0; i < 4; i++) {
@@ -714,7 +737,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * Removes one or multiple statement(s) from this formula
    * @param st - A Statement or array of Statements to remove
    */
-  remove(st: Statement | Statement[]): IndexedFormula {
+  remove(st: TFQuad | TFQuad[]): IndexedFormula {
     if (st instanceof Array) {
       for (var i = 0; i < st.length; i++) {
         this.remove(st[i])
@@ -737,7 +760,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * @param doc - The document / graph
    */
   removeDocument(doc: TFGraph): IndexedFormula {
-    var sts = this.statementsMatching(undefined, undefined, undefined, doc).slice() // Take a copy as this is the actual index
+    var sts: TFQuad[] = this.statementsMatching(undefined, undefined, undefined, doc).slice() // Take a copy as this is the actual index
     for (var i = 0; i < sts.length; i++) {
       this.removeStatement(sts[i])
     }
@@ -779,13 +802,13 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * @param graph The graph that contains the statement
    */
   removeMatches(
-    subject?: SubjectType | null,
-    predicate?: PredicateType | null,
-    object?: ObjectType | null,
-    graph?: GraphType | null
+    subject?: TFSubject | null,
+    predicate?: TFPredicate | null,
+    object?: TFObject | null,
+    graph?: TFGraph | null
   ): IndexedFormula {
     this.removeStatements(
-      this.statementsMatching(subject, predicate, object,why)
+      this.statementsMatching(subject, predicate, object, graph)
     )
     return this
   }
@@ -797,9 +820,9 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    *        Make sure you only use this for these.
    *        Otherwise, you should use remove() above.
    */
-  removeStatement(st: Statement): IndexedFormula {
+  removeStatement(st: TFQuad): IndexedFormula {
     // log.debug("entering remove w/ st=" + st)
-    var term = [ st.subject, st.predicate, st.object, st.why ]
+    var term = [ st.subject, st.predicate, st.object, st.graph ]
     for (var p = 0; p < 4; p++) {
       var c = this.canon(term[p])
       var h = this.id(c)
@@ -817,7 +840,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * Removes statements
    * @param sts The statements to remove
    */
-  removeStatements(sts: ReadonlyArray<Statement>): IndexedFormula {
+  removeStatements(sts: ReadonlyArray<TFQuad>): IndexedFormula {
     for (var i = 0; i < sts.length; i++) {
       this.remove(sts[i])
     }
@@ -827,7 +850,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   /**
    * Replace big with small, obsoleted with obsoleting.
    */
-  replaceWith (big, small) {
+  replaceWith (big: TFTerm, small: TFTerm) {
     // log.debug("Replacing "+big+" with "+small) // this.id(@@
     var oldhash = this.id(big)
     var newhash = this.id(small)
@@ -849,7 +872,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
       moveIndex(this.index[i])
     }
     this.redirections[oldhash] = small
-    if (big.uri) {
+    if (big.value) {
       // @@JAMBO: must update redirections,aliases from sub-items, too.
       if (!this.aliases[newhash]) {
         this.aliases[newhash] = []
@@ -861,7 +884,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
           this.aliases[newhash].push(this.aliases[oldhash][i])
         }
       }
-      this.add(small, this.sym('http://www.w3.org/2007/ont/link#uri'), big.uri)
+      this.add(small, this.sym('http://www.w3.org/2007/ont/link#uri'), big.value)
       // If two things are equal, and one is requested, we should request the other.
       if (this.fetcher) {
         this.fetcher.nowKnownAs(big, small)
@@ -898,10 +921,10 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     var y1 = this.canon(y)
     //    alert('y1='+y1); //@@
     if (!y1) return false
-    return (x1.uri === y1.uri)
+    return (x1.value === y1.value)
   }
 
-  setPrefixForURI (prefix, nsuri) {
+  setPrefixForURI (prefix: string, nsuri: string): void {
     // TODO: This is a hack for our own issues, which ought to be fixed
     // post-release
     // See http://dig.csail.mit.edu/cgi-bin/roundup.cgi/$rdf/issue227
@@ -924,14 +947,14 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * @param justOne - flag - stop when found one rather than get all of them?
    * @returns An array of nodes which match the wildcard position
    */
-
+  //@ts-ignore incompatible with extended signature from Formula
   statementsMatching (
     subj?: TFSubject | null,
     pred?: TFPredicate | null,
     obj?: TFObject | null,
     why?: TFGraph | null,
     justOne?: boolean
-  ): Statement[] {
+  ): TFQuad[] {
     // log.debug("Matching {"+subj+" "+pred+" "+obj+"}")
     var pat = [ subj, pred, obj, why ]
     var pattern: TFTerm[] = []
@@ -1011,8 +1034,8 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   uris(term: TFNamedNode): string[] {
     var cterm = this.canon(term)
     var terms = this.aliases[this.id(cterm)]
-    if (!cterm.uri) return []
-    var res = [ cterm.uri ]
+    if (!cterm.value) return []
+    var res = [ cterm.value ]
     if (terms) {
       for (var i = 0; i < terms.length; i++) {
         res.push(terms[i].uri)

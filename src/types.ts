@@ -6,6 +6,7 @@ import Literal from './literal';
 import NamedNode from './named-node';
 import { TFNamedNode } from './types';
 import DefaultGraph from './default-graph';
+import { SupportTable } from './data-factory-type';
 
 /**
  * Types that support both Enums (for typescript) and regular strings
@@ -29,20 +30,52 @@ export enum TermType {
 }
 
 /** A valid mime type header */
-export enum ContentType {
-  rdfxml = "application/rdf+xml",
-  turtle = "text/turtle",
-  turtleLegacy = "application/x-turtle",
-  n3 = "text/n3",
-  n3Legacy = "application/n3",
-  nTriples = "application/n-triples",
-  nQuads = "application/n-quads",
-  nQuadsAlt = "application/nquads",
-  jsonld = "application/ld+json",
-  xhtml = "application/xhtml+xml",
-  html = "text/html",
-  sparqlupdate = "application/sparql-update",
+// export const enum ContentType {
+//   rdfxml = "application/rdf+xml",
+//   turtle = "text/turtle",
+//   turtleLegacy = "application/x-turtle",
+//   n3 = "text/n3",
+//   n3Legacy = "application/n3",
+//   nTriples = "application/n-triples",
+//   nQuads = "application/n-quads",
+//   nQuadsAlt = "application/nquads",
+//   jsonld = "application/ld+json",
+//   xhtml = "application/xhtml+xml",
+//   html = "text/html",
+//   sparqlupdate = "application/sparql-update",
+// }
+
+/** A valid mime type header */
+export const ContentType = {
+  rdfxml: "application/rdf+xml",
+  turtle: "text/turtle",
+  turtleLegacy: "application/x-turtle",
+  n3: "text/n3",
+  n3Legacy: "application/n3",
+  nTriples: "application/n-triples",
+  nQuads: "application/n-quads",
+  nQuadsAlt: "application/nquads",
+  jsonld: "application/ld+json",
+  xhtml: "application/xhtml+xml",
+  html: "text/html",
+  sparqlupdate: "application/sparql-update",
 }
+
+export type ContentTypes =
+  "application/rdf+xml" |
+  "text/turtle" |
+  "application/x-turtle" |
+  "application/x-turtle" |
+  "text/n3" |
+  "application/n3" |
+  "application/n-triples" |
+  "application/n-quads" |
+  "application/nquads" |
+  "application/ld+json" |
+  "application/xhtml+xml" |
+  "text/html" |
+  "application/sparql-update"
+
 
 /** A type for values that serves as inputs */
 export type ValueType = TFTerm | Node | Date | string | number | boolean | undefined | null | Collection;
@@ -168,6 +201,12 @@ export interface TFDataFactory<
   DFNamedNode extends TFNamedNode = TFNamedNode,
   DFBlankNode extends TFBlankNode = TFBlankNode,
   DFLiteral extends TFLiteral = TFLiteral,
+  DFSubject = TFSubject,
+  DFPredicate = TFPredicate,
+  DFObject = TFObject,
+  DFGraph = TFGraph,
+  DFDefaultGraph = TFDefaultGraph,
+  DFQuad = TFQuad,
 > {
   /** Returns a new instance of NamedNode. */
   namedNode: (value: string) => DFNamedNode,
@@ -186,29 +225,34 @@ export interface TFDataFactory<
   variable?: (value: string) => TFVariable,
   /**
    * Returns an instance of DefaultGraph.
-   * Note: This differs from the TF spec!
   */
-  defaultGraph: () => TFDefaultGraph | DFNamedNode | DFBlankNode,
+  defaultGraph: () => DFDefaultGraph,
   /**
    * Returns a new instance of the specific Term subclass given by original.termType
    * (e.g., NamedNode, BlankNode, Literal, etc.),
    * such that newObject.equals(original) returns true.
+   * Not implemented in RDFJS, so optional.
    */
-  fromTerm: (original: TFTerm) => TFTerm
+  fromTerm?: (original: TFTerm) => TFTerm
   /**
    * Returns a new instance of Quad, such that newObject.equals(original) returns true.
+   * Not implemented in RDFJS, so optional.
    */
-  fromQuad: (original: TFQuad) => TFQuad
+  fromQuad?: (original: DFQuad) => DFQuad
   /**
    * Returns a new instance of Quad.
    * If graph is undefined or null it MUST set graph to a DefaultGraph.
    */
   quad: (
-    subject: TFSubject,
-    predicate: TFPredicate,
-    object: TFObject,
-    graph?: TFGraph
-  ) => TFQuad
+    subject: DFSubject,
+    predicate: DFPredicate,
+    object: DFObject,
+    graph?: DFGraph,
+  ) => DFQuad
+  /**
+   * This does not exist on the original RDF/JS spec
+   */
+  supports: SupportTable
 }
 
 export interface Bindings {
@@ -216,13 +260,13 @@ export interface Bindings {
 }
 
 /** A RDF/JS taskforce Subject */
-export type TFSubject = TFNamedNode | TFBlankNode // | TFVariable
+export type TFSubject = TFNamedNode | TFBlankNode | TFVariable
 /** A RDF/JS taskforce Predicate */
-export type TFPredicate = TFNamedNode // | TFVariable
+export type TFPredicate = TFNamedNode | TFVariable
 /** A RDF/JS taskforce Object */
-export type TFObject = TFNamedNode | TFBlankNode | TFLiteral  // | TFVariable
+export type TFObject = TFNamedNode | TFBlankNode | TFLiteral | TFVariable
 /** A RDF/JS taskforce Graph */
-export type TFGraph = TFNamedNode | TFDefaultGraph | TFBlankNode  // | TFVariable
+export type TFGraph = TFNamedNode | TFDefaultGraph | TFBlankNode | TFVariable
 
 /** All the types that a .fromValue() method might return */
 export type FromValueReturns = TFTerm | undefined | null | Collection

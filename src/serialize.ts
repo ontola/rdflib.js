@@ -1,34 +1,36 @@
 import * as convert from './convert'
 import Serializer from './serializer'
-import { ContentType } from './types'
+import { ContentType, ContentTypes, TFNamedNode, TFBlankNode } from './types'
 import IndexedFormula from './store'
+import { Formula } from './index'
 
 /**
  * Serialize to the appropriate format
  */
 export default function serialize (
-  target,
+  /** The graph or nodes that should be serialized */
+  target: Formula | TFNamedNode | TFBlankNode,
   /** The store */
-  kb: IndexedFormula,
+  kb?: IndexedFormula,
   base?,
   /**
    * The mime type.
    * Defaults to Turtle.
    */
-  contentType?: ContentType,
-  callback?: (err: Error, result?: any ) => void,
+  contentType?: string | ContentTypes,
+  callback?: (err?: Error | null, result?: string ) => void,
   options?
 ) {
-  base = base || target.uri
+  base = base || target.value
   options = options || {}
   contentType = contentType || ContentType.turtle // text/n3 if complex?
   var documentString: string | null = null
   try {
     var sz = Serializer(kb)
     if (options.flags) sz.setFlags(options.flags)
-    var newSts = kb.statementsMatching(undefined, undefined, undefined, target)
+    var newSts = kb!.statementsMatching(undefined, undefined, undefined, target)
     var n3String: string
-    sz.suggestNamespaces(kb.namespaces)
+    sz.suggestNamespaces(kb!.namespaces)
     sz.setBase(base)
     switch (contentType) {
       case ContentType.rdfxml:
@@ -71,7 +73,7 @@ export default function serialize (
     throw err // Don't hide problems from caller in sync mode
   }
 
-  function executeCallback (err, result) {
+  function executeCallback (err?: Error | null, result?: string) {
     if (callback) {
       callback(err, result)
       return
