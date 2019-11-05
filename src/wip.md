@@ -1,13 +1,13 @@
 Builds upon the approved #363 PR for [typescript migration](https://github.com/linkeddata/rdflib.js/issues/355):
 
+## Changes included in PR #363
+
 - Converted some of the most fundamental classes to typescript, including `Node`, `Literal`, `BlankNode`, `NamedNode`, `Collection`, `Statement`.
 - Introduced a `.types` file for shared types.
 - Included a temporary `types-temp.ts` file in project root as a reference file for documentation and keeping track of the ts migration process.
 - The `.isVar` method is set to boolean values, instead of `0` or `1`. This seemed reasonable, as it's only used for boolean type checks, and the existing types already define it as a boolean value. Timbl confirmed that `isVar` is only used for boolean operations.
-- JSDoc is switched with Typedoc. Combined with typescript, it makes the documentation far more complete.
-- Sometimes I had to make assumptions on date types, e.g. that a user will never create a Statement containing a Collection. These assumptions used to be implicit, but typescript forces us to make them explicit. This happens when you see type assertions (value as type).
-- Literals can apparently be null or undefined, when nodes are created using the `.fromValue` method. This happens in the Statement constructor. See #362.
-- I used many of the descriptions and comments from `@types/rdflib` by [Cénotélie](https://github.com/cenotelie/). Added credits in `package.json`, discussed this with Cénotélie.
+- JSDoc is replaced with Typedoc. Combined with types and comments from `@types/rdflib`, this makes the documentation far more complete.
+- I used many of the types and comments from `@types/rdflib` by [Cénotélie](https://github.com/cenotelie/). Added credits in `package.json`, discussed this with Cénotélie.
 
 ## New changes
 
@@ -38,31 +38,6 @@ Builds upon the approved #363 PR for [typescript migration](https://github.com/l
 - Created one huge `Options` type for Fetcher. Not sure if this is the way to go.
 - In `Node.toJS`, the boolean only returned true if the `xsd:boolean` value is `'1'`, now it it should also work for `'true'`.
 
-## Language
-
-Getting started with Linked Data or RDF can be difficult, since it introduces quite a few new concepts.
-Since this library is powerful and generic, it might be one of the first and most important RDF tools that a developer will use.
-Therefore, we should try to use consistent langauge and keep synonyms to a minimum.
-
-- The name `Node` and `Term` refer to the same concept. Both are used in this repo. I think Term is a better word, not only because it complies to the TF spec, but also because it seems more sementically correct. A Literal, for examepl, is not really a `Node`, it's more of an `Edge`, but it still extends `Node`.
-- `Statement`, `Triple` and `Quad` refer to the same concept. Maybe we could pick one: I suggest Statement.
-- The concept `graph` is referred to as `why`, `doc` and `graph` in the code and API. I think this might be confusing - should we just call it `graph` everywhere?
-- the `IndexedFormula` name is different from the `store` filename. It might be easier to just call it `store` everywhere.
-- We have a lot of names for `a bunch of Statements`: `Graph` (which is also the fourth item of a `Quad`), `Document` / `doc`, `Store`, `Forumula`, `IndexedFormula`, `Collection`, `Resource`, `kb`... Some of these have clear differences, but I feel like we should try to eliminate part of the terminology to reduce the mental load on newcomers.
-
-## Things I noticed:
-
-- The `optional` argument in `formula.js` does not seem to be documented, used or tested - should it be removed?
-- The `IndexedFormula.add()` method has logic for Statement array inputs and store inputs, but this behavior is not documented. It also refers to `this.fetcher` and `this.defaultGraph`, which both should not be available.
-- The filenames of major classes differ from their default exports, e.g. `store.ts` is called `IndexedFormula`.
-
-- Aliases (e.g. `IndexedFormula.match` for  `IndexefFormula.statementsMatching`) introduce complexity, documentation and type duplication. I suggest adding deprecation warnings.
-- The various calling methods of `Fetcher.nowOrWhenFetched` are quite dynamic, I'd rather have a stricter type for each argument.
-- The Variable type (or `TFVariable`) really messes with some assumptions. I feel like they should not be valid in regular quads, since it's impossible to serialize them decently. If I'd add it to the accepted types, we'd require a lot of typeguards in functions.
-- Many promise functions could be converted to async.
-- The `Fetcher` `StatusValues` should be `numbers`, but can be many types in RDFlib. This breaks compatibility with extending `Response` types. I feel we should only use the `499` browser error and add the message to the `requestbody`. I've created a type for the internal `Response`; it shows how it differs from regular `Response`s.
-- The `IndexedFormula` and `Formula` methods have incompatible types, such as in `compareTerm`, `variable` and `add`. I've added commented `//@ts-ignore` lines.
-
 ## Weird behavior / possible bugs not fixed by this PR
 
 - The `Parse.executeErrorCallback` conditional logic is always `true`.
@@ -73,9 +48,33 @@ Therefore, we should try to use consistent langauge and keep synonyms to a minim
 - In `Fetcher.addtype`, the final logic will allways return `true`, since `redirection` is a `NamedNode`. Should it call `.value`?
 
 ## Unused code
+
 - `IndexedFormula.predicateCallback` is checked, but never used in this codebase.
+- The `optional` argument in `formula.js` does not seem to be documented, used or tested - should it be removed?
+
+## Other things I noticed:
+
+- Literals can apparently be `null` or `undefined`, when nodes are created using the `.fromValue` method. This causes faulty behavior. This happens in the `new Statement()` constructor as well. See #362.
+- The `IndexedFormula.add()` method has logic for Statement array inputs and store inputs, but this behavior is not documented. It also refers to `this.fetcher` and `this.defaultGraph`, which both should not be available.
+- The filenames of major classes differ from their default exports, e.g. `store.ts` is called `IndexedFormula`.
+- Aliases (e.g. `IndexedFormula.match` for `IndexefFormula.statementsMatching`) introduce complexity, documentation and type duplication. I suggest adding deprecation warnings.
+- The various calling methods of `Fetcher.nowOrWhenFetched` are quite dynamic. A simpler, stricter input type might be preferable.
+- The Variable type (or `TFVariable`) really messes with some assumptions. I feel like they should not be valid in regular quads, since it's impossible to serialize them decently. If I'd add it to the accepted types, we'd require a lot of typeguards in functions.
+- The `Fetcher` `StatusValues` can be many types in RDFlib: string, number, true, undefined... This breaks compatibility with extending `Response` types, since these only use numbers. I feel we should only use the `499` browser error and add the text message to the `requestbody`. I've created a type for the internal `InternalResponse`; it shows how it differs from a regular `Response`.
+- The `IndexedFormula` and `Formula` methods have incompatible types, such as in `compareTerm`, `variable` and `add`. I've added `//@ts-ignore` lines with comments.
+
+## Some thoughts on simplifying language
+
+Getting started with Linked Data or RDF can be difficult, since it introduces quite a few new concepts.
+Since this library is powerful and generic, it might be one of the first and most important RDF tools that a developer will use.
+Therefore, we should try to use consistent langauge and keep synonyms to a minimum.
+
+- The name `Node` and `Term` seem to refer to the same concept. Both are used in this repo. I think Term is slightly more suited, partially because it complies to the TF spec, but also because it seems more sementically correct. A `Literal`, for example, is not really a node in the mathematical sense, it's more of an edge, since it cannot connect to other nodes.
+- `Statement`, `Triple` and `Quad` refer to the same concept, at least technically. Maybe we could pick one. I suggest `Statement`, because it covers both triples and quads.
+- The concept `graph` is referred to as `why`, `doc` and `graph` in the code and API. I think this might be confusing - should we just call it `graph` everywhere?
+- the `IndexedFormula` default export name is different from the `store` filename. It might be easier to just call it `store` everywhere, including where it's called `kb`.
 
 ## Probably OK, but I don't get it:
-- In `Fetcher`, `this.fireCallbacks` is called a few times, but it does not exist. Is this because of `callbackify`?
+
 - I'm a bit embarassed about this, but even after rewriting so much of the code I still don't understand all methods. E.g. `Forumla.transitiveClosure()`
 - Some functions in `Fetcher` assume that specific `Opts` are defined. I've included all these in a single `Opts` type, but I'm not sure about this approach.

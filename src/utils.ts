@@ -1,6 +1,6 @@
 
 import Fetcher from './fetcher';
-import { TFDataFactory, TFTerm, TFQuad, TFNamedNode, TFSubject, TermType, TFLiteral, TFPredicate, TFObject, TFGraph } from './types';
+import { TFDataFactory, TFTerm, TFQuad, TFNamedNode, TFSubject, TermType, TFLiteral, TFPredicate, TFObject, TFGraph, ObjectType } from './types';
 import { IndexedFormula, NamedNode, Statement } from './index';
 import { docpart } from './uri';
 import { string_startswith } from './util';
@@ -11,14 +11,17 @@ export function isTFStatement(obj: any): obj is TFQuad {
   return obj && Object.prototype.hasOwnProperty.call(obj, "subject")
 }
 
+/** TypeGuard for RDF/JS TaskForce Terms. */
 export function isStatement(obj: any): obj is Statement {
   return obj && obj instanceof Statement
 }
 
+/** TypeGuard for RDF/JS TaskForce Terms. */
 export function isStore(obj: any): obj is IndexedFormula {
   return obj && Object.prototype.hasOwnProperty.call(obj, "statements")
 }
 
+/** TypeGuard for RDF/JS TaskForce NamedNodes. */
 export function isTFNamedNode(obj: any): obj is TFNamedNode {
   return obj && Object.prototype.hasOwnProperty.call(obj, "termType") && obj.termType === "NamedNode"
 }
@@ -27,19 +30,23 @@ export function isNamedNode<T>(value: T | TFTerm): value is NamedNode {
   return (value as TFTerm).termType === TermType.NamedNode
 }
 
+/** TypeGuard for RDF/JS TaskForce Terms. */
 export function isTFTerm(obj: any): obj is TFTerm {
   return obj && Object.prototype.hasOwnProperty.call(obj, "termType")
 }
 
+/** TypeGuard for RDF/JS TaskForce Literals. */
 export function isTFLiteral(value: any): value is TFLiteral {
   return (value as TFTerm).termType === TermType.Literal
 }
 
+/** TypeGuard for RDFLib Collections. */
 export function isCollection<T>(obj: T | TFTerm): obj is Collection {
   return obj && Object.prototype.hasOwnProperty.call(obj, "termType")
     && (obj as TFTerm).termType === TermType.Collection
 }
 
+/** TypeGuard for valid RDFJS Taskforce Subject types. */
 export function isTFSubject(obj: any): obj is TFSubject {
   return obj && Object.prototype.hasOwnProperty.call(obj, "termType") && (
     obj.termType === TermType.NamedNode ||
@@ -47,16 +54,28 @@ export function isTFSubject(obj: any): obj is TFSubject {
   )
 }
 
+/** TypeGuard for valid RDFJS Taskforce Predicate types. */
 export function isTFPredicate(obj: any): obj is TFPredicate {
   return obj && Object.prototype.hasOwnProperty.call(obj, "termType") && (
     obj.termType === TermType.NamedNode
   )
 }
 
+/** TypeGuard for valid RDFJS Taskforce Object types. */
 export function isTFObject(obj: any): obj is TFObject {
   return obj && Object.prototype.hasOwnProperty.call(obj, "termType") && (
     obj.termType === TermType.NamedNode ||
     obj.termType === TermType.BlankNode ||
+    obj.termType === TermType.Literal
+  )
+}
+
+/** TypeGuard for valid RDFJS Object types. */
+export function isRDFObject(obj: any): obj is ObjectType {
+  return obj && Object.prototype.hasOwnProperty.call(obj, "termType") && (
+    obj.termType === TermType.NamedNode ||
+    obj.termType === TermType.BlankNode ||
+    obj.termType === TermType.Collection ||
     obj.termType === TermType.Literal
   )
 }

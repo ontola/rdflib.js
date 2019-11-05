@@ -30,6 +30,7 @@ import { Bindings, TFTerm, TFPredicate, TFSubject, TFObject, TFGraph, TFQuad, Su
 import { NamedNode } from './index'
 import Statement from './statement';
 import { Indexable } from './data-factory-type'
+import { isRDFObject } from './utils'
 
 const owlNamespaceURI = 'http://www.w3.org/2002/07/owl#'
 
@@ -362,10 +363,10 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
       throw "Subject is not a subject type"
     }
     if (!isTFPredicate(pred)) {
-      throw "Predicate is not a predicate type"
+      throw `Predicate ${pred} is not a predicate type`
     }
-    if (!isTFObject(obj)) {
-      throw "Predicate is not a predicate type"
+    if (!isRDFObject(obj)) {
+      throw `Object ${obj} is not an object type`
     }
     if (!isTFGraph(why)) {
       throw "Why is not a graph type"
