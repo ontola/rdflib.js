@@ -20,14 +20,14 @@
 import ClassOrder from './class-order'
 import { defaultGraphURI } from './data-factory-internal'
 import Formula, { FormulaOpts } from './formula'
-import { ArrayIndexOf, isTFStatement, isStore, uriCreator, isTFSubject, isTFPredicate, isTFObject, isTFGraph } from './utils'
+import { ArrayIndexOf, isTFStatement, isStore, uriCreator, isTFSubject, isTFPredicate, isTFObject, isTFGraph, isStatement } from './utils'
 import Node from './node'
 import Variable from './variable'
 import { Query, indexedFormulaQuery } from './query'
 import { RDFArrayRemove } from './util';
 import UpdateManager from './update-manager';
-import { TFDataFactory, Bindings, TFTerm, TFPredicate, TFSubject, TFObject, TFGraph, TFQuad, SubjectType, PredicateType, ObjectType, GraphType, TFNamedNode } from './types'
-import { NamedNode, Collection } from './index'
+import { Bindings, TFTerm, TFPredicate, TFSubject, TFObject, TFGraph, TFQuad, SubjectType, PredicateType, ObjectType, GraphType, TFNamedNode } from './types'
+import { NamedNode } from './index'
 import Statement from './statement';
 import { Indexable } from './data-factory-type'
 
@@ -39,7 +39,7 @@ export { defaultGraphURI }
 // var link_ns = 'http://www.w3.org/2007/ont/link#'
 
 // Handle Functional Property
-function handleFP (formula, subj, pred, obj) {
+function handleFP (formula: IndexedFormula, subj: TFSubject, pred: TFPredicate, obj: TFObject): boolean {
   var o1 = formula.any(subj, pred, undefined)
   if (!o1) {
     return false // First time with this value
@@ -50,7 +50,7 @@ function handleFP (formula, subj, pred, obj) {
 } // handleFP
 
 // Handle Inverse Functional Property
-function handleIFP (formula, subj, pred, obj) {
+function handleIFP (formula: IndexedFormula, subj: TFSubject, pred: TFPredicate, obj: TFObject): boolean {
   var s1 = formula.any(undefined, pred, obj)
   if (!s1) {
     return false // First time with this value
@@ -62,10 +62,10 @@ function handleIFP (formula, subj, pred, obj) {
 
 function handleRDFType (
   formula: IndexedFormula,
-  subj: SubjectType,
-  pred: PredicateType,
-  obj: ObjectType,
-  why: GraphType
+  subj: TFSubject,
+  pred: TFPredicate,
+  obj: TFObject,
+  why: TFGraph
 ) {
   //@ts-ignore this method does not seem to exist in this library
   if (formula.typeCallback) {
@@ -171,8 +171,8 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    */
   //@ts-ignore different from signature in Formula
   substitute(bindings: Bindings): IndexedFormula {
-    var statementsCopy = this.statements.map(function (ea) {
-      return ea.substitute(bindings)
+    var statementsCopy = this.statements.map(function (ea: TFQuad) {
+      return (ea as Statement).substitute(bindings)
     })
     var y = new IndexedFormula()
     y.add(statementsCopy)
@@ -182,9 +182,9 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   /**
    * Apply a set of statements to be deleted and to be inserted
    *
-   * @param patch The set of statements to be deleted and to be inserted
-   * @param target The name of the document to patch
-   * @param patchCallback Callback to be called when patching is complete
+   * @param patch - The set of statements to be deleted and to be inserted
+   * @param target - The name of the document to patch
+   * @param patchCallback - Callback to be called when patching is complete
    */
   applyPatch(
     patch: {
@@ -198,7 +198,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     var ds
     var binding = null
 
-    function doPatch (onDonePatch) {
+    function doPatch (onDonePatch: Function) {
       if (patch['delete']) {
         ds = patch['delete']
         // console.log(bindingDebug(binding))
@@ -207,7 +207,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
         // console.log('applyPatch: delete: ' + ds)
         ds = ds.statements as Statement[]
         var bad = []
-        var ds2 = ds.map(function (st: Statement) { // Find the actual statemnts in the store
+        var ds2 = ds.map(function (st: TFQuad) { // Find the actual statemnts in the store
           var sts = targetKB.statementsMatching(st.subject, st.predicate, st.object, target)
           if (sts.length === 0) {
             // log.info("NOT FOUND deletable " + st)
@@ -232,9 +232,9 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
         ds = patch['insert']
         if (binding) ds = ds.substitute(binding)
         ds = ds.statements
-        ds.map(function (st) {
-          st.why = target
-          targetKB.add(st.subject, st.predicate, st.object, st.why)
+        ds.map(function (st: TFQuad) {
+          st.graph = target
+          targetKB.add(st.subject, st.predicate, st.object, st.graph)
         })
       }
       onDonePatch()
@@ -328,7 +328,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    */
   //@ts-ignore differs from signature in Formula
   add (
-    subj: TFSubject | Statement | TFQuad[],
+    subj: TFSubject | TFQuad | TFQuad[] | Statement | Statement[],
     pred?: TFPredicate,
     obj?: TFObject,
     why?: TFGraph
@@ -416,7 +416,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
 
   /**
    * Returns the symbol with canonical URI as smushed
-   * @param term A RDF node
+   * @param term - An RDF node
    */
   canon(term: TFTerm): TFTerm {
     if (!term) {
@@ -608,7 +608,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     predicate?: TFPredicate | null,
     object?: TFObject | null,
     graph?: TFGraph | null
-  ): Statement[] {
+  ): TFQuad[] {
     return this.statementsMatching(
       Node.fromValue(subject),
       Node.fromValue(predicate),

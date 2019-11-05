@@ -40,10 +40,9 @@ import serialize from './serialize'
 
 import { fetch as solidAuthCli } from 'solid-auth-cli'
 import { fetch as solidAuthClient } from 'solid-auth-client'
-import { TFBlankNode, TFNamedNode, TFTerm, TFGraph, TFSubject, ContentType } from './types'
+import { TFBlankNode, TFNamedNode, TFTerm, TFGraph, TFSubject, ContentType, ContentTypes } from './types'
 import { Formula, BlankNode } from './index'
 import Literal from './literal'
-import Collection from './collection'
 
 // This is a special fetch which does OIDC auth, catching 401 errors
 const fetch = typeof window === 'undefined' ? solidAuthCli : solidAuthClient
@@ -90,6 +89,7 @@ interface FetchError extends Error {
   response?: ResponseType
 }
 
+// Both Fetch like Response objects as InternalResponse types are allowed
 type ResponseType = Response | InternalResponse
 
 interface ExtendedResponse extends Response {
@@ -103,15 +103,17 @@ interface InternalResponse {
   /** The request meta blank node */
   req: TFNamedNode
   statusText: string
+  responseText: string
 }
 
 /** tell typescript that a 'panes' child may exist on Window */
 declare global {
   interface Window {
     panes?: any
-    $SolidTestEnvironment: string
   }
 }
+
+declare var $SolidTestEnvironment: string | undefined
 
 type UserCallback = (
   ok: boolean,
@@ -136,7 +138,7 @@ interface Options extends RequestInit{
    * Override the incoming header to
    * force the data to be treated as this content-type (for reads)
    */
-  forceContentType?: ContentType
+  forceContentType?: ContentTypes
   /**
    * Load the data even if loaded before.
    * Also sets the `Cache-Control:` header to `no-cache`
@@ -260,7 +262,7 @@ class XHTMLHandler extends Handler {
     // dc:title
     let title = this.dom.getElementsByTagName('title')
     if (title.length > 0) {
-      kb.add(options.resource, ns.dc('title'), kb.literal(title[0].textContent),
+      kb.add(options.resource, ns.dc('title'), kb.literal(title[0].textContent as string),
         options.resource)
       // log.info("Inferring title of " + xhr.resource)
     }
@@ -276,7 +278,7 @@ class XHTMLHandler extends Handler {
       }
       if (relation) {
         fetcher.linkData(options.original, relation,
-          links[x].getAttribute('href'), options.resource, reverse)
+          links[x].getAttribute('href') as string, options.resource, reverse)
       }
     }
 
@@ -285,8 +287,8 @@ class XHTMLHandler extends Handler {
     for (let i = 0; i < scripts.length; i++) {
       let contentType = scripts[i].getAttribute('type')
       if (Parsable[contentType!]) {
-        rdfParse(scripts[i].textContent, kb, options.original.value, contentType)
-        rdfParse(scripts[i].textContent, kb, options.original.value, contentType)
+        rdfParse(scripts[i].textContent as string, kb, options.original.value, contentType)
+        rdfParse(scripts[i].textContent as string, kb, options.original.value, contentType)
       }
     }
 
@@ -1029,7 +1031,7 @@ export default class Fetcher implements CallbackifyInterface {
     return this._fetch(actualProxyURI, options)
       .then(response => this.handleResponse(response, docuri, options),
             error => { // @@ handleError?
-              let dummyResponse: ResponseType = {
+              let dummyResponse = {
                 url: actualProxyURI,
                 status: 999, // @@ what number/string should fetch failures report?
                 statusText: (error.name || 'network failure') + ': ' +
@@ -1471,7 +1473,7 @@ export default class Fetcher implements CallbackifyInterface {
           let msg = 'Web error: ' + response.status
           if (response.statusText) msg += ' (' + response.statusText + ')'
           msg += ' on ' + method + ' of <' + uri + '>'
-          if (response.responseText) msg += ': ' + response.responseText
+          if ((response as InternalResponse).responseText) msg += ': ' + response.responseText
           let e2: FetchError = new Error(msg)
           e2.response = response
           reject(e2)

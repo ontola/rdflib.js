@@ -322,7 +322,7 @@ export default class Formula extends Node {
     return new Collection()
   }
 
-  /** Follow links from one node, using one wildcard
+  /** Follow links from one node, using one wildcard.
   *
   * For example, each(me, knows, null, profile)  - people I know accoring to my profile .
   * each(me, knows, null, null)  - people I know accoring to anything in store .
@@ -582,7 +582,7 @@ export default class Formula extends Node {
   findTypeURIs(
     subject: TFSubject
   ): {
-      [uri: string]: boolean;
+      [uri: string]: string;
   } {
     return this.NTtoURI(this.findTypesNT(subject))
   }
@@ -744,7 +744,7 @@ export default class Formula extends Node {
   }
 
   /**
-   * Gets a literal node
+   * Creates a Literal node
    * @param val - The literal's lexical value
    * @param lang - The language
    * @param dt - The datatype as a named node
