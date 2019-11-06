@@ -18,7 +18,7 @@ export type VariableTermType = "Variable" | TermType.Variable
 export type CollectionTermType = "Collection" | TermType.Collection
 export type DefaultGraphTermType = "DefaultGraph" | TermType.DefaultGraph
 
-export enum TermType {
+export const enum TermType {
   NamedNode = "NamedNode",
   BlankNode = "BlankNode",
   Literal = "Literal",
@@ -30,52 +30,20 @@ export enum TermType {
 }
 
 /** A valid mime type header */
-// export const enum ContentType {
-//   rdfxml = "application/rdf+xml",
-//   turtle = "text/turtle",
-//   turtleLegacy = "application/x-turtle",
-//   n3 = "text/n3",
-//   n3Legacy = "application/n3",
-//   nTriples = "application/n-triples",
-//   nQuads = "application/n-quads",
-//   nQuadsAlt = "application/nquads",
-//   jsonld = "application/ld+json",
-//   xhtml = "application/xhtml+xml",
-//   html = "text/html",
-//   sparqlupdate = "application/sparql-update",
-// }
-
-/** A valid mime type header */
-export const ContentType = {
-  rdfxml: "application/rdf+xml",
-  turtle: "text/turtle",
-  turtleLegacy: "application/x-turtle",
-  n3: "text/n3",
-  n3Legacy: "application/n3",
-  nTriples: "application/n-triples",
-  nQuads: "application/n-quads",
-  nQuadsAlt: "application/nquads",
-  jsonld: "application/ld+json",
-  xhtml: "application/xhtml+xml",
-  html: "text/html",
-  sparqlupdate: "application/sparql-update",
+export const enum ContentType {
+  rdfxml = "application/rdf+xml",
+  turtle = "text/turtle",
+  turtleLegacy = "application/x-turtle",
+  n3 = "text/n3",
+  n3Legacy = "application/n3",
+  nTriples = "application/n-triples",
+  nQuads = "application/n-quads",
+  nQuadsAlt = "application/nquads",
+  jsonld = "application/ld+json",
+  xhtml = "application/xhtml+xml",
+  html = "text/html",
+  sparqlupdate = "application/sparql-update",
 }
-
-export type ContentTypes =
-  "application/rdf+xml" |
-  "text/turtle" |
-  "application/x-turtle" |
-  "application/x-turtle" |
-  "text/n3" |
-  "application/n3" |
-  "application/n-triples" |
-  "application/n-quads" |
-  "application/nquads" |
-  "application/ld+json" |
-  "application/xhtml+xml" |
-  "text/html" |
-  "application/sparql-update"
-
 
 /** A type for values that serves as inputs */
 export type ValueType = TFTerm | Node | Date | string | number | boolean | undefined | null | Collection;

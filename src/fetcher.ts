@@ -40,8 +40,8 @@ import serialize from './serialize'
 
 import { fetch as solidAuthCli } from 'solid-auth-cli'
 import { fetch as solidAuthClient } from 'solid-auth-client'
-import { TFBlankNode, TFNamedNode, TFTerm, TFGraph, TFSubject, ContentType, ContentTypes } from './types'
-import { Formula, BlankNode } from './index'
+import { TFBlankNode, TFNamedNode, TFTerm, TFGraph, TFSubject, ContentType } from './types'
+import { Formula } from './index'
 import Literal from './literal'
 
 // This is a special fetch which does OIDC auth, catching 401 errors
@@ -90,20 +90,19 @@ interface FetchError extends Error {
 }
 
 // Both Fetch like Response objects as InternalResponse types are allowed
-type ResponseType = Response | InternalResponse
-
-interface ExtendedResponse extends Response {
-  responseText: string
-}
+type ResponseType = Response | InternalResponse | Partial<Response>
 
 /** Internal type for Responses. Resembles the Response type for .fetch() */
 interface InternalResponse {
   /** Originally, this just allows numbers, but RDFLib also uses other status types */
-  status: StatusValues
+  status?: StatusValues
   /** The request meta blank node */
-  req: TFNamedNode
-  statusText: string
-  responseText: string
+  req?: TFNamedNode
+  statusText?: string
+  responseText?: string
+  url?: string
+  size?: number
+  timeout?: number
 }
 
 /** tell typescript that a 'panes' child may exist on Window */
@@ -113,12 +112,14 @@ declare global {
   }
 }
 
-declare var $SolidTestEnvironment: string | undefined
+declare var $SolidTestEnvironment: {
+  localSiteMap?: any
+}
 
 type UserCallback = (
   ok: boolean,
   message: string,
-  response: any
+  response?: any
 ) => void
 
 type HTTPMethods = 'GET' | 'PUT' | 'POST' | 'PATCH' | 'HEAD' | 'DELETE' | 'CONNECT' | 'TRACE' | 'OPTIONS'
@@ -133,12 +134,12 @@ interface Options extends RequestInit{
    */
   referringTerm?: TFNamedNode
   /** Provided content type (for writes) */
-  contentType: string
+  contentType?: string
   /**
    * Override the incoming header to
    * force the data to be treated as this content-type (for reads)
    */
-  forceContentType?: ContentTypes
+  forceContentType?: ContentType
   /**
    * Load the data even if loaded before.
    * Also sets the `Cache-Control:` header to `no-cache`
@@ -148,13 +149,13 @@ interface Options extends RequestInit{
    * Original uri to preserve
    * through proxying etc (`xhr.original`).
    */
-  baseURI: string
+  baseURI?: string
   /**
    * Whether this request is a retry via
    * a proxy (generally done from an error handler)
    */
   proxyUsed?: boolean
-  actualProxyURI: string
+  actualProxyURI?: string
   /** flag for XHR/CORS etc */
   withCredentials?: boolean
   /** Before we parse new data, clear old, but only on status 200 responses */
@@ -168,18 +169,17 @@ interface Options extends RequestInit{
   retriedWithNoCredentials?: boolean
   requestedURI?: string
   // Seems to be required in some functions, such as XHTML parse and RedirectToProxy
-  resource: TFNamedNode
+  resource?: TFSubject
   /** The serialized resource in the body*/
   // Used for storing metadata of requests
-  original: TFNamedNode
+  original?: TFNamedNode
   // Like requeststatus? Can contain text with error.
   data?: string
-  req: TFBlankNode
-  // TODO: document & type these
-  credentials?: anyhuh
+  req?: TFBlankNode
   // Might be the same as Options.data
   body?: string
-  headers?: anyhuh
+  headers?: Headers
+  credentials?: 'include' | 'omit'
 }
 
 class Handler {
@@ -211,7 +211,10 @@ class RDFXMLHandler extends Handler {
     fetcher: Fetcher,
     /** An XML String */
     responseText: String,
-    options: Options,
+    /** Requires .original */
+    options: {
+      original: TFSubject
+    } & Options,
   ) {
     let kb = fetcher.store
     if (!this.dom) {
@@ -244,14 +247,17 @@ class XHTMLHandler extends Handler {
     return 'XHTMLHandler'
   }
 
-  static register (fetcher) {
+  static register (fetcher: Fetcher) {
     fetcher.mediatypes['application/xhtml+xml'] = {}
   }
 
   parse (
     fetcher: Fetcher,
     responseText: string,
-    options: Options,
+    options: {
+      resource: TFSubject
+      original: TFSubject
+    } & Options,
   ): Promise<FetchError> | ResponseType {
     let relation, reverse: boolean
     if (!this.dom) {
@@ -287,7 +293,9 @@ class XHTMLHandler extends Handler {
     for (let i = 0; i < scripts.length; i++) {
       let contentType = scripts[i].getAttribute('type')
       if (Parsable[contentType!]) {
+        //@ts-ignore incompatibility between Store.add and Formula.add
         rdfParse(scripts[i].textContent as string, kb, options.original.value, contentType)
+        //@ts-ignore incompatibility between Store.add and Formula.add
         rdfParse(scripts[i].textContent as string, kb, options.original.value, contentType)
       }
     }
@@ -324,7 +332,11 @@ class XMLHandler extends Handler {
   parse (
     fetcher: Fetcher,
     responseText: string,
-    options: Options,
+    options: {
+      original: TFSubject
+      req: TFBlankNode
+      resource: TFSubject
+    } & Options,
   ): ResponseType | Promise<FetchError> {
     let dom = Util.parseXML(responseText)
 
@@ -400,7 +412,13 @@ class HTMLHandler extends Handler {
     }
   }
 
-  parse (fetcher: Fetcher, responseText: string, options: Options): Promise<FetchError> | ResponseType {
+  parse (
+    fetcher: Fetcher,
+    responseText: string,
+    options: {
+      req: TFSubject,
+    } & Options
+  ): Promise<FetchError> | ResponseType {
     let kb = fetcher.store
 
     // We only handle XHTML so we have to figure out if this is XML
@@ -457,7 +475,13 @@ class TextHandler extends Handler {
     }
   }
 
-  parse (fetcher: Fetcher, responseText: string, options: Options): ResponseType | Promise<FetchError> {
+  parse (
+    fetcher: Fetcher,
+    responseText: string,
+    options: {
+      req: TFSubject
+    } & Options
+  ): ResponseType | Promise<FetchError> {
     // We only speak dialects of XML right now. Is this XML?
 
     // Look for an XML declaration
@@ -579,7 +603,7 @@ type StatusValues =
 interface MediatypesMap {
   [id: string]: {
     // Either string '1.0' or number 1.0 is allowed
-    'q': number | string
+    'q'?: number | string
   };
 }
 
@@ -607,6 +631,10 @@ interface BooleanMap {
   [uri: string]: boolean
 }
 
+// Not sure about the shapes of this. Response? Strin?
+type Result = ResponseType
+
+/** Differs from normal Fetch, has an extended Response type */
 type Fetch = (input: RequestInfo, init?: RequestInit) => Promise<ResponseType>;
 
 /** Fetcher
@@ -649,6 +677,9 @@ export default class Fetcher implements CallbackifyInterface {
   nonexistent: BooleanMap
   lookedUp: BooleanMap
   handlers: Array<typeof Handler>
+  static HANDLERS: {
+    [handlerName: number]: Handler
+  }
   // TODO: Document this
   static crossSiteProxyTemplate: any
 
@@ -815,7 +846,7 @@ export default class Fetcher implements CallbackifyInterface {
    * Loads a web resource or resources into the store.
    *
    * A resource may be given as NamedNode object, or as a plain URI.
-   * an arrsy of resources will be given, in which they will be fetched in parallel.
+   * an array of resources will be given, in which they will be fetched in parallel.
    * By default, the HTTP headers are recorded also, in the same store, in a separate graph.
    * This allows code like editable() for example to test things about the resource.
    *
@@ -857,7 +888,7 @@ export default class Fetcher implements CallbackifyInterface {
   load (
     uri: TFNamedNode | string | Array<string | TFNamedNode>,
     options: Options = {}
-  ): Promise<string> | Promise<string[]> {
+  ): Promise<Result> {
     options = Object.assign({}, options) // Take a copy as we add stuff to the options!!
     if (uri instanceof Array) {
       return Promise.all(
@@ -883,7 +914,7 @@ export default class Fetcher implements CallbackifyInterface {
     uri: string,
     originalUri: string,
     options: Options
-  ): Promise<string> {
+  ): Promise<Result> {
     let pendingPromise
 
     // Check to see if some request is already dealing with this uri
@@ -936,7 +967,7 @@ export default class Fetcher implements CallbackifyInterface {
     options.baseURI = options.baseURI || uri // Preserve though proxying etc
     options.original = kb.sym(options.baseURI)
     options.req = kb.bnode()
-    options.headers = options.headers || {}
+    options.headers = options.headers || new Headers
 
     if (options.contentType) {
       options.headers['content-type'] = options.contentType
@@ -997,13 +1028,13 @@ export default class Fetcher implements CallbackifyInterface {
       }
       if (state === 'failed' && this.requested[docuri] === 404) { // Remember nonexistence
         let message = 'Previously failed: ' + this.requested[docuri]
-        let dummyResponse: Response = {
+        let dummyResponse: ResponseType = {
           url: docuri,
           // This does not comply to Fetch spec, it can be a string value in rdflib
           status: this.requested[docuri] as number,
           statusText: message,
           responseText: message,
-          headers: {},  // Headers() ???
+          headers: new Headers,  // Headers() ???
           ok: false,
           body: null,
           bodyUsed: false,
@@ -1028,31 +1059,32 @@ export default class Fetcher implements CallbackifyInterface {
 
     let { actualProxyURI } = options
 
+    //@ts-ignore
     return this._fetch(actualProxyURI, options)
       .then(response => this.handleResponse(response, docuri, options),
-            error => { // @@ handleError?
-              let dummyResponse = {
-                url: actualProxyURI,
-                status: 999, // @@ what number/string should fetch failures report?
-                statusText: (error.name || 'network failure') + ': ' +
-                  (error.errno || error.code || error.type),
-                responseText: error.message,
-                headers: {},  // Headers() ???
-                ok: false,
-                body: null,
-                bodyUsed: false,
-                size: 0,
-                timeout: 0
-              }
-              console.log('Fetcher: <' + actualProxyURI + '> Non-HTTP fetch exception: ' + error)
-              return this.handleError(dummyResponse, docuri, options) // possible credentials retry
-              // return this.failFetch(options, 'fetch failed: ' + error, 999, dummyResponse) // Fake status code: fetch exception
+      error => { // @@ handleError?
+        let dummyResponse = {
+          url: actualProxyURI,
+          status: 999, // @@ what number/string should fetch failures report?
+          statusText: (error.name || 'network failure') + ': ' +
+            (error.errno || error.code || error.type),
+          responseText: error.message,
+          headers: new Headers(),  // Headers() ???
+          ok: false,
+          body: null,
+          bodyUsed: false,
+          size: 0,
+          timeout: 0
+        }
+        console.log('Fetcher: <' + actualProxyURI + '> Non-HTTP fetch exception: ' + error)
+        return this.handleError(dummyResponse, docuri, options) // possible credentials retry
+        // return this.failFetch(options, 'fetch failed: ' + error, 999, dummyResponse) // Fake status code: fetch exception
 
-              // handleError expects a response so we fake some important bits.
-              /*
-              this.handleError(, docuri, options)
-              */
-            }
+        // handleError expects a response so we fake some important bits.
+        /*
+        this.handleError(, docuri, options)
+        */
+      }
     )
   }
 
@@ -1084,9 +1116,9 @@ export default class Fetcher implements CallbackifyInterface {
    *                     includes response.status as the HTTP status if any.
    */
   nowOrWhenFetched (
-    uriIn: string | NamedNode,
-    p2,
-    userCallback: UserCallback,
+    uriIn: string | TFNamedNode,
+    p2?: UserCallback | Options,
+    userCallback?: UserCallback,
     options: Options = {}
   ): void {
     const uri = uriCreator(uriIn)
@@ -1105,16 +1137,16 @@ export default class Fetcher implements CallbackifyInterface {
     }
 
     this.load(uri, options)
-      .then(fetchResponse => {
+      .then((fetchResponse: ResponseType) => {
         if (userCallback) {
           if (fetchResponse) {
-            if (fetchResponse.ok) {
+            if ((fetchResponse as Response).ok) {
               userCallback(true, 'OK', fetchResponse)
             } else {
               // console.log('@@@ fetcher.js Should not take this path !!!!!!!!!!!!')
               let oops = 'HTTP error: Status ' + fetchResponse.status + ' (' + fetchResponse.statusText + ')'
-              if (fetchResponse.responseText) {
-                oops += ' ' + fetchResponse.responseText // not in 404, dns error, nock failure
+              if ((fetchResponse as InternalResponse).responseText) {
+                oops += ' ' + (fetchResponse as InternalResponse).responseText // not in 404, dns error, nock failure
               }
               console.log(oops + ' fetching ' + uri)
               userCallback(false, oops, fetchResponse)
@@ -1132,13 +1164,14 @@ export default class Fetcher implements CallbackifyInterface {
         if (err.response && err.response.status) {
           message += ' status: ' + err.response.status
         }
-        userCallback(false, message, err.response)
+        (userCallback as any)(false, message, err.response)
       })
   }
 
   /**
    * Records a status message (as a literal node) by appending it to the
    * request's metadata status collection.
+   *
    */
   addStatus (
     req: TFBlankNode,
@@ -1168,7 +1201,10 @@ export default class Fetcher implements CallbackifyInterface {
    *  - Rejects with an error result object, which has a response object if any
    */
   failFetch (
-    options: Options,
+    options: {
+      req: TFSubject
+      original: TFSubject
+    } & Options,
     errorMessage: string,
     statusCode: StatusValues,
     response?: ResponseType
@@ -1183,7 +1219,7 @@ export default class Fetcher implements CallbackifyInterface {
     let isGet = meth === 'GET' || meth === 'HEAD'
 
     if (isGet) {  // only cache the status code on GET or HEAD
-      if (!options.resource.equals(options.original)) {
+      if (!(options as any).resource.equals(options.original)) {
         // console.log('@@ Recording failure  ' + meth + '  original ' + options.original +option '( as ' + options.resource + ') : ' + statusCode)
       } else {
         // console.log('@@ Recording ' + meth + ' failure for ' + options.original + ': ' + statusCode)
@@ -1277,7 +1313,10 @@ export default class Fetcher implements CallbackifyInterface {
   }
 
   doneFetch (
-    options: Options,
+    options: {
+      req: TFSubject,
+      original: TFSubject
+    } & Options,
     response: ResponseType
   ): ResponseType {
     this.addStatus(options.req, 'Done.')
@@ -1318,7 +1357,7 @@ export default class Fetcher implements CallbackifyInterface {
     uri = (uri as TFNamedNode).value || uri // Accept object or string
     let doc = new NamedNode(uri).doc() // strip off #
     options.contentType = options.contentType || 'text/turtle'
-    options.data = serialize(doc, this.store, doc.value, options.contentType)
+    options.data = serialize(doc, this.store, doc.value, options.contentType) as string
     return this.webOperation('PUT', uri, options)
   }
 
@@ -1436,9 +1475,9 @@ export default class Fetcher implements CallbackifyInterface {
    */
   webOperation (
     method: HTTPMethods,
-    uriIn: string | NamedNode,
+    uriIn: string | TFNamedNode,
     // Not sure about this type. Maybe this Options is different?
-    options: Options = {}
+    options: Options
   ): Promise<ResponseType> {
     const uri = uriCreator(uriIn)
     options.method = method
@@ -1450,20 +1489,20 @@ export default class Fetcher implements CallbackifyInterface {
       throw new Error('Web operation sending data must have a defined contentType.')
     }
     if (options.contentType) {
-      options.headers = options.headers || {}
-      options.headers['content-type'] = options.contentType
+      (options as any).headers = options.headers || {};
+      (options as any).headers['content-type'] = options.contentType
     }
     Fetcher.setCredentials(uri, options)
 
     return new Promise(function (resolve, reject) {
       fetcher._fetch(uri, options).then(response => {
-        if (response.ok) {
+        if ((response as Response).ok) {
           if (method === 'PUT' || method === 'PATCH' || method === 'POST' || method === 'DELETE') {
             fetcher.invalidateCache (uri)
           }
-          if (response.body) {
-            response.text().then(data => {
-              response.responseText = data
+          if ((response as Response).body) {
+            (response as Response).text().then(data => {
+              (response as InternalResponse).responseText = data
               resolve(response)
             })
           } else {
@@ -1473,7 +1512,7 @@ export default class Fetcher implements CallbackifyInterface {
           let msg = 'Web error: ' + response.status
           if (response.statusText) msg += ' (' + response.statusText + ')'
           msg += ' on ' + method + ' of <' + uri + '>'
-          if ((response as InternalResponse).responseText) msg += ': ' + response.responseText
+          if ((response as InternalResponse).responseText) msg += ': ' + (response as InternalResponse).responseText
           let e2: FetchError = new Error(msg)
           e2.response = response
           reject(e2)
@@ -1518,12 +1557,12 @@ export default class Fetcher implements CallbackifyInterface {
     header: string
   ): undefined | string[] {
     const kb = this.store
-    const requests = kb.each(undefined, ns.link('requestedURI'), doc)
+    const requests = kb.each(undefined, ns.link('requestedURI'), doc) as TFSubject[]
 
     for (let r = 0; r < requests.length; r++) {
       let request = requests[r]
       if (request !== undefined) {
-        let response = kb.any(request, ns.link('response'))
+        let response = kb.any(request, ns.link('response')) as TFSubject
 
         if (response !== undefined && kb.anyValue(response, ns.http('status')) && kb.anyValue(response, ns.http('status')).startsWith('2')) {
           // Only look at success returns - not 401 error messagess etc
@@ -1553,7 +1592,7 @@ export default class Fetcher implements CallbackifyInterface {
     this.addStatus(options.req, 'Accept: ' + options.headers['accept'])
 
     if (isTFNamedNode(rterm)) {
-      kb.add(docuri, ns.link('requestedBy'), rterm, this.appNode)
+      kb.add(new NamedNode(docuri), ns.link('requestedBy'), rterm, this.appNode)
     }
 
     if (options.original && options.original.value !== docuri) {
@@ -1571,14 +1610,20 @@ export default class Fetcher implements CallbackifyInterface {
     kb.add(req, ns.link('status'), kb.collection(), this.appNode)
   }
 
-  saveResponseMetadata (response: ResponseType, options: Options) {
+  saveResponseMetadata (
+    response: Response,
+    options: {
+      req: TFBlankNode,
+      resource: TFSubject
+    } & Options
+  ): TFBlankNode {
     const kb = this.store
 
     let responseNode = kb.bnode()
 
     kb.add(options.req, ns.link('response'), responseNode, responseNode)
     kb.add(responseNode, ns.http('status'),
-      kb.literal(response.status), responseNode)
+      kb.literal(response.status as any), responseNode)
     kb.add(responseNode, ns.http('statusText'),
       kb.literal(response.statusText), responseNode)
 
@@ -1588,7 +1633,7 @@ export default class Fetcher implements CallbackifyInterface {
 
     // Save the response headers
     response.headers.forEach((value, header) => {
-      kb.add(responseNode, ns.httph(header), value, responseNode)
+      kb.add(responseNode, ns.httph(header), new Literal(value), responseNode)
 
       if (header === 'content-type') {
         kb.add(options.resource, ns.rdf('type'), Util.mediaTypeClass(value), responseNode)
@@ -1598,7 +1643,7 @@ export default class Fetcher implements CallbackifyInterface {
     return responseNode
   }
 
-  objectRefresh (term) {
+  objectRefresh (term: TFNamedNode): void {
     let uris = this.store.uris(term) // Get all URIs
     if (typeof uris !== 'undefined') {
       for (let i = 0; i < uris.length; i++) {
@@ -1610,10 +1655,13 @@ export default class Fetcher implements CallbackifyInterface {
 
   /* refresh  Reload data from a given document
   **
-  ** @param  {NamedNode} term -  An RDF Named Node for the eodcument in question
-  ** @param  {function } userCallback - A function userCallback(ok, message, response)
+  ** @param term - An RDF Named Node for the eodcument in question
+  ** @param userCallback - A function userCallback(ok, message, response)
   */
-  refresh (term: TFNamedNode, userCallback) { // sources_refresh
+  refresh (
+    term: TFNamedNode,
+    userCallback?: UserCallback
+  ): void { // sources_refresh
     this.fireCallbacks('refresh', arguments)
 
     this.nowOrWhenFetched(term, { force: true, clearPreviousData: true },
@@ -1622,22 +1670,22 @@ export default class Fetcher implements CallbackifyInterface {
 
  /* refreshIfExpired   Conditional refresh if Expired
  **
- ** @param  {NamedNode} term -  An RDF Named Node for the eodcument in question
- ** @param  {function } userCallback - A function userCallback(ok, message, response)
+ ** @param term - An RDF Named Node for the eodcument in question
+ ** @param userCallback - A function userCallback(ok, message, response)
  */
   refreshIfExpired (
     term: TFNamedNode,
-    userCallback: (ok: boolean, message: string, response: {}) => void
-  ) {
+    userCallback: UserCallback
+  ): void {
     let exp = this.getHeader(term, 'Expires')
-    if (!exp || (new Date(exp).getTime()) <= (new Date().getTime())) {
+    if (!exp || (new Date(exp[0]).getTime()) <= (new Date().getTime())) {
       this.refresh(term, userCallback)
     } else {
       userCallback(true, 'Not expired', {})
     }
   }
 
-  retract (term: TFTerm) { // sources_retract
+  retract (term: TFGraph) { // sources_retract
     this.store.removeMany(undefined, undefined, undefined, term)
     if (term.value) {
       delete this.requested[Uri.docpart(term.value)]
@@ -1676,7 +1724,10 @@ export default class Fetcher implements CallbackifyInterface {
     handler.register(this)
   }
 
-  retryNoCredentials (docuri, options) {
+  retryNoCredentials (
+    docuri: string,
+    options
+  ): void {
     console.log('Fetcher: CORS: RETRYING with NO CREDENTIALS for ' + options.resource)
 
     options.retriedWithNoCredentials = true // protect against being called twice
@@ -1765,12 +1816,13 @@ export default class Fetcher implements CallbackifyInterface {
       if (doc && doc.value) {
         kb.add(kb.sym(doc.value), ns.rdf('type'), rdfType, this.appNode)
       } // convert Literal
-      prev = kb.any(undefined, kb.sym('http://www.w3.org/2007/ont/link#redirectedRequest'), prev)
+      prev = kb.any(undefined, kb.sym('http://www.w3.org/2007/ont/link#redirectedRequest'), prev) as TFSubject
       if (!prev) { break }
       var response = kb.any(prev, kb.sym('http://www.w3.org/2007/ont/link#response'))
       if (!response) { break }
       var redirection = kb.any((response as TFNamedNode), kb.sym('http://www.w3.org/2007/ont/http#status'))
       if (!redirection) { break }
+      //@ts-ignore always true?
       if (redirection !== '301' && redirection !== '302') { break }
     }
   }
@@ -1784,7 +1836,7 @@ export default class Fetcher implements CallbackifyInterface {
     options: Options
   ): Promise<string> {
     const kb = this.store
-    const headers = response.headers
+    const headers: Headers = (response as Response).headers
 
     const reqNode = options.req
 
@@ -1933,7 +1985,13 @@ export default class Fetcher implements CallbackifyInterface {
   /**
    * Sends a new request to the specified uri. (Extracted from `onerrorFactory()`)
    */
-  redirectToProxy (newURI: string, options: Options): Promise<ResponseType> {
+  redirectToProxy (
+    newURI: string,
+    options: {
+      req: TFSubject,
+      resource: TFSubject,
+    } & Options
+  ): Promise<ResponseType> {
     this.addStatus(options.req, 'BLOCKED -> Cross-site Proxy to <' + newURI + '>')
 
     options.proxyUsed = true

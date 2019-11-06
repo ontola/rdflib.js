@@ -37,8 +37,11 @@ Builds upon the approved #363 PR for [typescript migration](https://github.com/l
 - Removed unused second argument from `Fetcher.cleanupFetchRequest`
 - Created one huge `Options` type for Fetcher. Not sure if this is the way to go.
 - In `Node.toJS`, the boolean only returned true if the `xsd:boolean` value is `'1'`, now it it should also work for `'true'`.
+- Converted `kb.add(someString)` to `kb.add(new Namednode(somestring))` to enhance compatibility with other datafactories. This happens in `Fetcher` and
+- `Fetcher.refreshIfExpired` passed an array of headers, but it needs only one string.
+- `Fethcer` uses `Headers` a lot. I've changed empty objects to empty `new Headers` instances, which enhances compatibility with default `Fetch` behavior.
 
-## Weird behavior / possible bugs not fixed by this PR
+## Possible bugs not fixed by this PR
 
 - The `Parse.executeErrorCallback` conditional logic is always `true`.
 - `Formula.substitute()` uses `this.add(Statments[])`, which will crash. I think it should be removed, since `IndexedFormula.substitute` is used all the time anyway.
@@ -62,6 +65,8 @@ Builds upon the approved #363 PR for [typescript migration](https://github.com/l
 - The Variable type (or `TFVariable`) really messes with some assumptions. I feel like they should not be valid in regular quads, since it's impossible to serialize them decently. If I'd add it to the accepted types, we'd require a lot of typeguards in functions.
 - The `Fetcher` `StatusValues` can be many types in RDFlib: string, number, true, undefined... This breaks compatibility with extending `Response` types, since these only use numbers. I feel we should only use the `499` browser error and add the text message to the `requestbody`. I've created a type for the internal `InternalResponse`; it shows how it differs from a regular `Response`.
 - The `IndexedFormula` and `Formula` methods have incompatible types, such as in `compareTerm`, `variable` and `add`. I've added `//@ts-ignore` lines with comments.
+- `Serializer`'s fourth `options` argument is undocumented, and I couldn't find out how it worked.
+- `Fetcher` `saveResponseMetadata` creates literals
 
 ## Some thoughts on simplifying language
 

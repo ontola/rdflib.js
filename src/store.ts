@@ -26,8 +26,8 @@ import Variable from './variable'
 import { Query, indexedFormulaQuery } from './query'
 import { RDFArrayRemove } from './util';
 import UpdateManager from './update-manager';
-import { Bindings, TFTerm, TFPredicate, TFSubject, TFObject, TFGraph, TFQuad, SubjectType, PredicateType, ObjectType, GraphType, TFNamedNode } from './types'
-import { NamedNode } from './index'
+import { Bindings, TFTerm, TFPredicate, TFSubject, TFObject, TFGraph, TFQuad, SubjectType, PredicateType, ObjectType, GraphType, TFNamedNode, TFBlankNode } from './types'
+import { NamedNode, Collection } from './index'
 import Statement from './statement';
 import { Indexable } from './data-factory-type'
 import { isRDFObject } from './utils'
@@ -331,7 +331,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   add (
     subj: TFSubject | TFQuad | TFQuad[] | Statement | Statement[],
     pred?: TFPredicate,
-    obj?: TFObject,
+    obj?: TFObject | Collection,
     why?: TFGraph
   ): TFQuad | null | IndexedFormula {
     var i: number
@@ -448,28 +448,31 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
 
   /**
    * Checks a list of statements for consistency
-   * @param sts The list of statements to check
-   * @param from An index with the array ['subject', 'predicate', 'object', 'why']
+   * @param sts - The list of statements to check
+   * @param from - An index with the array ['subject', 'predicate', 'object', 'why']
    */
-  checkStatementList(sts: ReadonlyArray<Statement>, from: number): boolean | void {
+  checkStatementList(sts: ReadonlyArray<TFQuad>, from?: number): boolean | void {
+    if (from === undefined) {
+      from = 0
+    }
     var names = ['subject', 'predicate', 'object', 'why']
     var origin = ' found in ' + names[from] + ' index.'
-    var st
+    var st: TFQuad
     for (var j = 0; j < sts.length; j++) {
       st = sts[j]
-      var term = [ st.subject, st.predicate, st.object, st.why ]
-      var arrayContains = function (a, x) {
+      var term = [ st.subject, st.predicate, st.object, st.graph ]
+      var arrayContains = function (a: Array<any>, x: TFQuad) {
         for (var i = 0; i < a.length; i++) {
           if (a[i].subject.equals(x.subject) &&
             a[i].predicate.equals(x.predicate) &&
             a[i].object.equals(x.object) &&
-            a[i].why.equals(x.why)) {
+            a[i].why.equals(x.graph)) {
             return true
           }
         }
       }
       for (var p = 0; p < 4; p++) {
-        var c = this.canon(term[p])
+        var c = this.canon(term[p]) as TFNamedNode
         var h = this.id(c)
         if (!this.index[p][h]) {
           // throw new Error('No ' + name[p] + ' index for statement ' + st + '@' + st.why + origin)

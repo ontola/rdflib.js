@@ -7,7 +7,9 @@ import RDFParser from './rdfxmlparser'
 import sparqlUpdateParser from './patch-parser'
 import * as Util from './util'
 import Formula from './formula';
-import { TFQuad, ContentType, ContentTypes } from './types';
+import { TFQuad, ContentType } from './types';
+
+type CallbackFunc = (error: any, kb: Formula | null) => void
 
 /**
  * Parse a string and put the result into the graph kb.
@@ -24,11 +26,11 @@ export default function parse (
   str: string,
   kb: Formula,
   base: string,
-  contentType: string | ContentTypes,
-  callback?: (error: any, kb: Formula | null) => void
+  contentType: string | ContentType,
+  callback?: CallbackFunc
 ) {
   contentType = contentType || ContentType.turtle
-  contentType = contentType.split(';')[0] as ContentTypes
+  contentType = contentType.split(';')[0] as ContentType
   try {
     if (contentType === ContentType.n3 || contentType === ContentType.turtle) {
       var p = N3Parser(kb, kb, base, base, null, null, '', null)
@@ -85,7 +87,9 @@ export default function parse (
   function executeErrorCallback (e: Error): void {
     if (
       contentType !== ContentType.jsonld ||
+      //@ts-ignore always true?
       contentType !== ContentType.nQuads ||
+      //@ts-ignore always true?
       contentType !== ContentType.nQuadsAlt
     ) {
       if (callback) {
@@ -111,12 +115,12 @@ export default function parse (
 */
   function nquadCallback (err?: Error | null, nquads?: string): void {
     if (err) {
-      callback(err, kb)
+      (callback as CallbackFunc)(err, kb)
     }
     try {
       n3Parser.parse(nquads, tripleCallback)
     } catch (err) {
-      callback(err, kb)
+      (callback as CallbackFunc)(err, kb)
     }
   }
 
@@ -124,7 +128,7 @@ export default function parse (
     if (triple) {
       kb.add(triple.subject, triple.predicate, triple.object, triple.graph)
     } else {
-      callback(err, kb)
+      (callback as CallbackFunc)(err, kb)
     }
   }
 }

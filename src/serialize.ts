@@ -1,6 +1,6 @@
 import * as convert from './convert'
 import Serializer from './serializer'
-import { ContentType, ContentTypes, TFNamedNode, TFBlankNode } from './types'
+import { ContentType, TFNamedNode, TFBlankNode } from './types'
 import IndexedFormula from './store'
 import { Formula } from './index'
 
@@ -12,23 +12,29 @@ export default function serialize (
   target: Formula | TFNamedNode | TFBlankNode,
   /** The store */
   kb?: IndexedFormula,
-  base?,
+  base?: unknown,
   /**
    * The mime type.
    * Defaults to Turtle.
    */
-  contentType?: string | ContentTypes,
-  callback?: (err?: Error | null, result?: string ) => void,
-  options?
-) {
+  contentType?: string | ContentType,
+  callback?: (err?: Error | null, result?: string ) => any,
+  options?: {
+    /**
+     * A string of letters, each of which set an options
+     * e.g. `deinprstux`
+     */
+    flags: string
+  }
+): string | undefined {
   base = base || target.value
-  options = options || {}
+  const opts = options || {}
   contentType = contentType || ContentType.turtle // text/n3 if complex?
   var documentString: string | null = null
   try {
     var sz = Serializer(kb)
-    if (options.flags) sz.setFlags(options.flags)
-    var newSts = kb!.statementsMatching(undefined, undefined, undefined, target)
+    if ((opts as any).flags) sz.setFlags((opts as any).flags)
+    var newSts = kb!.statementsMatching(undefined, undefined, undefined, target as TFNamedNode)
     var n3String: string
     sz.suggestNamespaces(kb!.namespaces)
     sz.setBase(base)

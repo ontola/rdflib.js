@@ -41,6 +41,14 @@ interface SeedsMap {
   [uri: string]: boolean;
 }
 
+interface MembersMap {
+  [uri: string]: TFQuad;
+}
+
+interface UriMap {
+  [uri: string]: string;
+}
+
 /**
  * A formula, or store of RDF statements
 */
@@ -391,9 +399,7 @@ export default class Formula extends Node {
    */
   findMembersNT(
     thisClass: Node
-  ): {
-      [uri: string]: TFQuad;
-  } {
+  ): MembersMap {
     var i: number
     var l: number
     var len: number
@@ -402,7 +408,7 @@ export default class Formula extends Node {
     var len3: number
     var len4: number
     var m: number
-    var members
+    var members: MembersMap
     var pred: TFTerm
     var q: number
     var ref
@@ -465,9 +471,7 @@ export default class Formula extends Node {
    */
   findMemberURIs(
     subject: Node
-  ): {
-      [uri: string]: Statement;
-  } {
+  ): MembersMap {
     return this.NTtoURI(this.findMembersNT(subject))
   }
 
@@ -763,13 +767,9 @@ export default class Formula extends Node {
    * @return a collection of the URIs as strings
    * todo: explain why it is important to go through NT
    */
-  NTtoURI(t: {
-    [uri: string]: string;
-  }): {
-    [uri: string]: string;
-  }{
+  NTtoURI(t: MembersMap): UriMap{
     var k, v
-    var uris = {}
+    var uris: UriMap = {}
     for (k in t) {
       if (!t.hasOwnProperty(k)) continue
       v = t[k]
@@ -794,7 +794,7 @@ export default class Formula extends Node {
     sz.suggestNamespaces(this.namespaces)
     sz.setBase(base)
     if (provenance) {
-      sts = this.statementsMatching(void 0, void 0, void 0, provenance)
+      sts = this.statementsMatching(void 0, void 0, void 0, new NamedNode(provenance))
     } else {
       sts = this.statements
     }
