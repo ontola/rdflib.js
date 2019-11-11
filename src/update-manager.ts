@@ -15,6 +15,7 @@ import { isStore, isNamedNode } from './utils'
 import * as Util from './util'
 import Statement from './statement';
 import { NamedNode } from './index'
+import { TFNamedNode } from './types'
 
 interface UpdateManagerFormula extends IndexedFormula {
   fetcher: Fetcher
@@ -68,11 +69,11 @@ export default class UpdateManager {
     this.patchControl = []
   }
 
-  patchControlFor (doc) {
-    if (!this.patchControl[doc.uri]) {
-      this.patchControl[doc.uri] = []
+  patchControlFor (doc: TFNamedNode) {
+    if (!this.patchControl[doc.value]) {
+      this.patchControl[doc.value] = []
     }
-    return this.patchControl[doc.uri]
+    return this.patchControl[doc.value]
   }
 
   /**
@@ -587,7 +588,7 @@ export default class UpdateManager {
       return false
     }
 
-    wssURI = uriJoin(wssURI, doc.uri)
+    wssURI = uriJoin(wssURI, doc.value)
     wssURI = wssURI.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')
     console.log('Web socket URI ' + wssURI)
 
@@ -607,7 +608,7 @@ export default class UpdateManager {
       socket.onopen = function () {
         console.log('    websocket open')
         retryTimeout = 1500 // reset timeout to fast on success
-        this.send('sub ' + doc.uri)
+        this.send('sub ' + doc.value)
         if (retries) {
           console.log('Web socket has been down, better check for any news.')
           updater.requestDownstreamAction(doc, theHandler)
@@ -734,7 +735,7 @@ export default class UpdateManager {
         })
       })
 
-      var protocol = this.editable(doc.uri, kb)
+      var protocol = this.editable(doc.value, kb)
       if (protocol === false) {
         throw new Error('Update: Can\'t make changes in uneditable ' + doc)
       }
@@ -796,7 +797,7 @@ export default class UpdateManager {
           console.log('upstream count up to : ' + control.upstreamCount)
         }
 
-        this.fire(doc.uri, query, (uri, success, body, response) => {
+        this.fire(doc.value, query, (uri, success, body, response) => {
           response.elapsedTimeMs = Date.now() - startTime
           console.log('    UpdateManager: Return ' +
             (success ? 'success ' : 'FAILURE ') + response.status +
@@ -830,8 +831,8 @@ export default class UpdateManager {
           try {
             this.updateLocalFile(doc, ds, is, callback)
           } catch (e) {
-            callback(doc.uri, false,
-              'Exception trying to write back file <' + doc.uri + '>\n'
+            callback(doc.value, false,
+              'Exception trying to write back file <' + doc.value + '>\n'
               // + tabulator.Util.stackString(e))
             )
           }
@@ -868,7 +869,7 @@ export default class UpdateManager {
       newSts.push(is[i])
     }
 
-    const documentString = this.serialize(doc.uri, newSts, contentType)
+    const documentString = this.serialize(doc.value, newSts, contentType)
 
     // Write the new version back
     var candidateTarget = kb.the(response, this.ns.httph('content-location'))
@@ -896,10 +897,10 @@ export default class UpdateManager {
           kb.add(is[i].subject, is[i].predicate, is[i].object, doc)
         }
 
-        callbackFunction(doc.uri, response.ok, response.responseText, response)
+        callbackFunction(doc.value, response.ok, response.responseText, response)
       })
       .catch(err => {
-        callbackFunction(doc.uri, false, err.message, err)
+        callbackFunction(doc.value, false, err.message, err)
       })
   }
 
@@ -925,29 +926,29 @@ export default class UpdateManager {
       newSts.push(is[ i ])
     }
     // serialize to the appropriate format
-    var dot = doc.uri.lastIndexOf('.')
+    var dot = doc.value.lastIndexOf('.')
     if (dot < 1) {
-      throw new Error('Rewriting file: No filename extension: ' + doc.uri)
+      throw new Error('Rewriting file: No filename extension: ' + doc.value)
     }
-    var ext = doc.uri.slice(dot + 1)
+    var ext = doc.value.slice(dot + 1)
 
     let contentType = Fetcher.CONTENT_TYPE_BY_EXT[ ext ]
     if (!contentType) {
       throw new Error('File extension .' + ext + ' not supported for data write')
     }
 
-    const documentString = this.serialize(doc.uri, newSts, contentType)
+    const documentString = this.serialize(doc.value, newSts, contentType)
 
     // Write the new version back
     // create component for file writing
     console.log('Writing back: <<<' + documentString + '>>>')
-    var filename = doc.uri.slice(7) // chop off   file://  leaving /path
+    var filename = doc.value.slice(7) // chop off   file://  leaving /path
     // console.log("Writeback: Filename: "+filename+"\n")
     var file = Components.classes[ '@mozilla.org/file/local;1' ]
       .createInstance(Components.interfaces.nsILocalFile)
     file.initWithPath(filename)
     if (!file.exists()) {
-      throw new Error('Rewriting file <' + doc.uri +
+      throw new Error('Rewriting file <' + doc.value +
         '> but it does not exist!')
     }
     // {
@@ -971,7 +972,7 @@ export default class UpdateManager {
     for (let i = 0; i < is.length; i++) {
       kb.add(is[ i ].subject, is[ i ].predicate, is[ i ].object, doc)
     }
-    callbackFunction(doc.uri, true, '') // success!
+    callbackFunction(doc.value, true, '') // success!
   }
 
   /**
@@ -1032,18 +1033,18 @@ export default class UpdateManager {
 
     return Promise.resolve()
       .then(() => {
-        documentString = this.serialize(doc.uri, data, contentType)
+        documentString = this.serialize(doc.value, data, contentType)
 
         return kb.fetcher
-          .webOperation('PUT', doc.uri, { contentType, body: documentString })
+          .webOperation('PUT', doc.value, { contentType, body: documentString })
       })
       .then(response => {
         if (!response.ok) {
-          return callback(doc.uri, response.ok, response.error, response)
+          return callback(doc.value, response.ok, response.error, response)
         }
 
-        delete kb.fetcher.nonexistent[doc.uri]
-        delete kb.fetcher.requested[doc.uri] // @@ could this mess with the requested state machine? if a fetch is in progress
+        delete kb.fetcher.nonexistent[doc.value]
+        delete kb.fetcher.requested[doc.value] // @@ could this mess with the requested state machine? if a fetch is in progress
 
         if (typeof data !== 'string') {
           data.map((st) => {
@@ -1051,10 +1052,10 @@ export default class UpdateManager {
           })
         }
 
-        callback(doc.uri, response.ok, '', response)
+        callback(doc.value, response.ok, '', response)
       })
       .catch(err => {
-        callback(doc.uri, false, err.message)
+        callback(doc.value, false, err.message)
       })
   }
 
@@ -1070,12 +1071,12 @@ export default class UpdateManager {
    * @param doc {NamedNode}
    * @param callbackFunction
    */
-  reload (kb, doc, callbackFunction) {
+  reload (kb, doc: TFNamedNode, callbackFunction) {
     var startTime = Date.now()
     // force sets no-cache and
     const options = { force: true, noMeta: true, clearPreviousData: true }
 
-    kb.fetcher.nowOrWhenFetched(doc.uri, options, function (ok, body, response) {
+    kb.fetcher.nowOrWhenFetched(doc.value, options, function (ok, body, response) {
       if (!ok) {
         console.log('    ERROR reloading data: ' + body)
         callbackFunction(false, 'Error reloading data: ' + body, response)
