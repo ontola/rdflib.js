@@ -18,7 +18,11 @@ export type VariableTermType = "Variable" | TermType.Variable
 export type CollectionTermType = "Collection" | TermType.Collection
 export type DefaultGraphTermType = "DefaultGraph" | TermType.DefaultGraph
 
-export const enum TermType {
+/**
+ * All the possible TermTypes
+ * @todo Convert these to const enums when it's supported https://github.com/babel/babel/issues/8741
+ */
+export enum TermType {
   NamedNode = "NamedNode",
   BlankNode = "BlankNode",
   Literal = "Literal",
@@ -29,8 +33,11 @@ export const enum TermType {
   Graph = "Graph",
 }
 
-/** A valid mime type header */
-export const enum ContentType {
+/**
+ * A valid mime type header
+ * @todo Convert these to const enums when it's supported https://github.com/babel/babel/issues/8741
+ */
+export enum ContentType {
   rdfxml = "application/rdf+xml",
   turtle = "text/turtle",
   turtleLegacy = "application/x-turtle",
