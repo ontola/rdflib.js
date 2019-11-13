@@ -44,11 +44,12 @@ Builds upon the approved #363 PR for [typescript migration](https://github.com/l
 ## Possible bugs not fixed by this PR
 
 - The `Parse.executeErrorCallback` conditional logic is always `true`.
-- `Formula.substitute()` uses `this.add(Statments[])`, which will crash. I think it should be removed, since `IndexedFormula.substitute` is used all the time anyway.
-- The `Formula.serialize` function calls `serialize.ts` with only one argument, so without a store. I think this will crash every time, maybe it's rotten code?
-- `Formula.serialize` uses `this.namespaces`, but this is only defined in `IndexedFormula`
-- `store.add()` accepts many types of inputs, but this will lead to invalid statements (e.g. a Literal as a Subject). I suggest we make this more strict and throw more errors on wrong inputs. Relates to #362. We could still make the allowed inputs bigger by allowing other types with some explicit behavior, e.g. in subject arguments, create `NamedNodes` from `URL` objects and `strings` that look like URLs . In any case, I thinkg the `Node.formValue` behavior is too unpredictable for `store.add`. For now, I've updated the docs to match its behavior.
+- `Formula.substitute` uses `this.add(Statments[])`, which will crash. I think it should be removed, since `IndexedFormula.substitute` is used all the time anyway.
+- The `Formula.serialize` function calls `serialize.ts` with only one argument, so without a store. I think this will crash every time. Also`Formula.serialize` uses `this.namespaces`, but this is only defined in `IndexedFormula`. Is it rotten code and should it be removed?
+- `store.add()` accepts many types of inputs, but this will lead to invalid statements (e.g. a Literal as a Subject). I suggest we make this more strict and throw more errors on wrong inputs. Relates to #362. We could still make the allowed inputs bigger by allowing other types with some explicit behavior, e.g. in subject arguments, create `NamedNodes` from `URL` objects and `strings` that look like URLs . In any case, I thinkg the `Node.fromValue` behavior is too unpredictable for `store.add`. For now, I've updated the docs to match its behavior.
+- The types for `Node.fromValue` and `Literal.fromValue` show how unpredictable these methods are. I suggest we make them more strict (also relates to #362), so they either return a `TFTerm` (`node`) or throw an error - they should not return `undefined` or `null`. Also, I think they should be converted to functions in `Utils`: this would fix the circular dependency issue (why we need `node_internal`) and it would fix the type issues in `Literal.fromValue` (which tends to give issues since it's signature does not correctly extend from `Node.fromValue`)
 - In `Fetcher.addtype`, the final logic will allways return `true`, since `redirection` is a `NamedNode`. Should it call `.value`?
+- The `defaultGraph` iri is set to `chrome:theSession`, but this errors in Firefox. I suggest we change it to something else. See #370.
 
 ## Unused code
 
@@ -63,7 +64,7 @@ Builds upon the approved #363 PR for [typescript migration](https://github.com/l
 - Aliases (e.g. `IndexedFormula.match` for `IndexefFormula.statementsMatching`) introduce complexity, documentation and type duplication. I suggest adding deprecation warnings.
 - The various calling methods of `Fetcher.nowOrWhenFetched` are quite dynamic. A simpler, stricter input type might be preferable.
 - The Variable type (or `TFVariable`) really messes with some assumptions. I feel like they should not be valid in regular quads, since it's impossible to serialize them decently. If I'd add it to the accepted types, we'd require a lot of typeguards in functions.
-- The `Fetcher` `StatusValues` can be many types in RDFlib: string, number, true, undefined... This breaks compatibility with extending `Response` types, since these only use numbers. I feel we should only use the `499` browser error and add the text message to the `requestbody`. I've created a type for the internal `InternalResponse`; it shows how it differs from a regular `Response`.
+- `Fetcher` `StatusValues` can be many types in RDFlib: string, number, true, undefined... This breaks compatibility with extending `Response` types, since these only use numbers. I feel we should only use the `499` browser error and add the text message to the `requestbody`. I've created a type for the internal `InternalResponse`; it shows how it differs from a regular `Response`.
 - The `IndexedFormula` and `Formula` methods have incompatible types, such as in `compareTerm`, `variable` and `add`. I've added `//@ts-ignore` lines with comments.
 - `Serializer`'s fourth `options` argument is undocumented, and I couldn't find out how it worked.
 - `Fetcher` `saveResponseMetadata` creates literals
@@ -82,4 +83,4 @@ Therefore, we should try to use consistent langauge and keep synonyms to a minim
 ## Probably OK, but I don't get it:
 
 - I'm a bit embarassed about this, but even after rewriting so much of the code I still don't understand all methods. E.g. `Forumla.transitiveClosure()`
-- Some functions in `Fetcher` assume that specific `Opts` are defined. I've included all these in a single `Opts` type, but I'm not sure about this approach.
+- Some functions in `Fetcher` assume that specific `Opts` are defined. I've included all these in a single `Options` type (and an `AutoInitOptions` type which sets auto-initialized opts), and extended this type in each function where specific opts seemed to be required. I'm not entirely confident about the types I've set.

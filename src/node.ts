@@ -34,7 +34,7 @@ Node.fromValue = function
   if (Array.isArray(value)) {
     return new Collection(value) as T
   }
-  return Literal.fromValue<T as Literal>(value) as T
+  return Literal.fromValue<any>(value)
 }
 
 const ns = { xsd: Namespace('http://www.w3.org/2001/XMLSchema#') }

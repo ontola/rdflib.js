@@ -124,7 +124,11 @@ type UserCallback = (
 
 type HTTPMethods = 'GET' | 'PUT' | 'POST' | 'PATCH' | 'HEAD' | 'DELETE' | 'CONNECT' | 'TRACE' | 'OPTIONS'
 
-interface Options extends RequestInit{
+/** All valid inputs for initFetchOptions */
+type Options = Partial<AutoInitOptions>
+
+/** Initiated by initFetchOptions, which runs on load */
+interface AutoInitOptions extends RequestInit{
   /** The used Fetch function */
   fetch?: Fetch
   /**
@@ -149,7 +153,7 @@ interface Options extends RequestInit{
    * Original uri to preserve
    * through proxying etc (`xhr.original`).
    */
-  baseURI?: string
+  baseURI: string
   /**
    * Whether this request is a retry via
    * a proxy (generally done from an error handler)
@@ -169,16 +173,17 @@ interface Options extends RequestInit{
   retriedWithNoCredentials?: boolean
   requestedURI?: string
   // Seems to be required in some functions, such as XHTML parse and RedirectToProxy
-  resource?: TFSubject
+  resource: TFSubject
   /** The serialized resource in the body*/
   // Used for storing metadata of requests
-  original?: TFNamedNode
+  original: TFNamedNode
   // Like requeststatus? Can contain text with error.
   data?: string
+  // Probably an identifier for request?s
   req?: TFBlankNode
   // Might be the same as Options.data
   body?: string
-  headers?: Headers
+  headers: Headers
   credentials?: 'include' | 'omit'
 }
 
@@ -417,6 +422,8 @@ class HTMLHandler extends Handler {
     responseText: string,
     options: {
       req: TFSubject,
+      resource: TFSubject,
+      original: TFSubject,
     } & Options
   ): Promise<FetchError> | ResponseType {
     let kb = fetcher.store
@@ -480,6 +487,8 @@ class TextHandler extends Handler {
     responseText: string,
     options: {
       req: TFSubject
+      original: TFSubject
+      resource: TFSubject
     } & Options
   ): ResponseType | Promise<FetchError> {
     // We only speak dialects of XML right now. Is this XML?
@@ -530,7 +539,16 @@ class N3Handler extends Handler {
     } // post 2008
   }
 
-  parse (fetcher: Fetcher, responseText: string, options: Options, response: ResponseType) {
+  parse (
+    fetcher: Fetcher,
+    responseText: string,
+    options: {
+      original: TFNamedNode
+      req: TFSubject
+    }
+    & Options,
+    response: ResponseType
+  ): ResponseType | Promise<FetchError> {
     // Parse the text of this N3 file
     let kb = fetcher.store
     let p = N3Parser(kb, kb, options.original.value, options.original.value,
@@ -645,7 +663,7 @@ type Fetch = (input: RequestInfo, init?: RequestInit) => Promise<ResponseType>;
   * figuring how to parse them.  It will also refresh, remove, the data
   * and put back the fata to the web.
  */
-export default class Fetcher implements CallbackifyInterface {
+export default class Fetcher {
   store: IndexedFormula
   timeout: number
   _fetch: Fetch
@@ -901,7 +919,7 @@ export default class Fetcher implements CallbackifyInterface {
 
     options = this.initFetchOptions(docuri, options)
 
-    return this.pendingFetchPromise(docuri, options.baseURI, options)
+    return this.pendingFetchPromise(docuri, (options as AutoInitOptions).baseURI, options)
   }
 
   /**
@@ -955,7 +973,7 @@ export default class Fetcher implements CallbackifyInterface {
   initFetchOptions (
     uri: string,
     options: Options
-  ): Options {
+  ): AutoInitOptions {
     let kb = this.store
 
     let isGet = !options.method || options.method.toUpperCase() === 'GET'

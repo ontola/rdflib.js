@@ -11,11 +11,11 @@ import DataFactory from './data-factory'
 import Namespace from './namespace'
 import Serializer from './serializer'
 import { join as uriJoin } from './uri'
-import { isStore, isNamedNode } from './utils'
+import { isStore, isNamedNode, isTFBlankNode } from './utils'
 import * as Util from './util'
 import Statement from './statement';
 import { NamedNode } from './index'
-import { TFNamedNode } from './types'
+import { TFNamedNode, TFQuad } from './types'
 
 interface UpdateManagerFormula extends IndexedFormula {
   fetcher: Fetcher
@@ -85,7 +85,7 @@ export default class UpdateManager {
    * @returns The method string SPARQL or DAV or
    *   LOCALFILE or false if known, undefined if not known.
    */
-  editable (uri: string | NamedNode, kb: IndexedFormula): string | boolean | undefined {
+  editable (uri: string | TFNamedNode, kb: IndexedFormula): string | boolean | undefined {
     if (!uri) {
       return false // Eg subject is bnode, no known doc to write to
     }
@@ -93,10 +93,10 @@ export default class UpdateManager {
       kb = this.store
     }
     if (isNamedNode(uri)) {
-      uri = uri.uri
+      uri = uri.value
     }
 
-    if (uri.slice(0, 8) === 'file:///') {
+    if ((uri as string).slice(0, 8) === 'file:///') {
       if (kb.holds(
             kb.sym(uri),
             DataFactory.namedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'),
@@ -196,7 +196,7 @@ export default class UpdateManager {
       : obj.toNT()
   }
 
-  anonymizeNT (stmt) {
+  anonymizeNT (stmt: TFQuad) {
     return this.anonymize(stmt.subject) + ' ' +
       this.anonymize(stmt.predicate) + ' ' +
       this.anonymize(stmt.object) + ' .'
@@ -206,9 +206,9 @@ export default class UpdateManager {
    * Returns a list of all bnodes occurring in a statement
    * @private
    */
-  statementBnodes (st) {
+  statementBnodes (st: TFQuad) {
     return [st.subject, st.predicate, st.object].filter(function (x) {
-      return x.isBlank
+      return isTFBlankNode(x)
     })
   }
 
@@ -216,7 +216,7 @@ export default class UpdateManager {
    * Returns a list of all bnodes occurring in a list of statements
    * @private
    */
-  statementArrayBnodes (sts) {
+  statementArrayBnodes (sts: TFQuad[]) {
     var bnodes = []
     for (let i = 0; i < sts.length; i++) {
       bnodes = bnodes.concat(this.statementBnodes(sts[i]))
@@ -240,12 +240,12 @@ export default class UpdateManager {
     var a = this.store.each(undefined, this.ns.rdf('type'),
       this.ns.owl('InverseFunctionalProperty'))
     for (let i = 0; i < a.length; i++) {
-      this.ifps[a[i].uri] = true
+      this.ifps[a[i].value] = true
     }
     this.fps = {}
     a = this.store.each(undefined, this.ns.rdf('type'), this.ns.owl('FunctionalProperty'))
     for (let i = 0; i < a.length; i++) {
-      this.fps[a[i].uri] = true
+      this.fps[a[i].value] = true
     }
   }
 
@@ -261,7 +261,7 @@ export default class UpdateManager {
     var y
     var res
     for (let i = 0; i < sts.length; i++) {
-      if (this.fps[sts[i].predicate.uri]) {
+      if (this.fps[sts[i].predicate.value]) {
         y = sts[i].subject
         if (!y.isBlank) {
           return [ sts[i] ]
@@ -277,7 +277,7 @@ export default class UpdateManager {
     // outgoing links
     sts = this.store.statementsMatching(x, undefined, undefined, source)
     for (let i = 0; i < sts.length; i++) {
-      if (this.ifps[sts[i].predicate.uri]) {
+      if (this.ifps[sts[i].predicate.value]) {
         y = sts[i].object
         if (!y.isBlank) {
           return [ sts[i] ]
@@ -338,9 +338,9 @@ export default class UpdateManager {
    * Returns the best context for a single statement
    * @private
    */
-  statementContext (st) {
+  statementContext (st: TFQuad) {
     var bnodes = this.statementBnodes(st)
-    return this.bnodeContext(bnodes, st.why)
+    return this.bnodeContext(bnodes, st.graph)
   }
 
   /**
@@ -401,15 +401,15 @@ export default class UpdateManager {
    * It returns an object which includes
    *  function which can be used to change the object of the statement.
    */
-  update_statement (statement) {
-    if (statement && !statement.why) {
+  update_statement (statement: TFQuad) {
+    if (statement && !statement.graph) {
       return
     }
     var updater = this
     var context = this.statementContext(statement)
 
     return {
-      statement: statement ? [statement.subject, statement.predicate, statement.object, statement.why] : undefined,
+      statement: statement ? [statement.subject, statement.predicate, statement.object, statement.graph] : undefined,
       statementNT: statement ? this.anonymizeNT(statement) : undefined,
       where: updater.contextWhere(context),
 
@@ -421,12 +421,12 @@ export default class UpdateManager {
           this.anonymize(this.statement[1]) + ' ' +
           this.anonymize(obj) + ' ' + ' . }\n'
 
-        updater.fire(this.statement[3].uri, query, callbackFunction)
+        updater.fire(this.statement[3].value, query, callbackFunction)
       }
     }
   }
 
-  insert_statement (st, callbackFunction) {
+  insert_statement (st: TFQuad, callbackFunction) {
     var st0 = st instanceof Array ? st[0] : st
     var query = this.contextWhere(this.statementContext(st0))
 
@@ -441,7 +441,7 @@ export default class UpdateManager {
         this.anonymize(st.object) + ' ' + ' . }\n'
     }
 
-    this.fire(st0.why.uri, query, callbackFunction)
+    this.fire(st0.graph.value, query, callbackFunction)
   }
 
   delete_statement (st, callbackFunction) {
@@ -459,7 +459,7 @@ export default class UpdateManager {
         this.anonymize(st.object) + ' ' + ' . }\n'
     }
 
-    this.fire(st0.why.uri, query, callbackFunction)
+    this.fire(st0.graph.value, query, callbackFunction)
   }
 
 /// //////////////////////
@@ -473,7 +473,7 @@ export default class UpdateManager {
    * @param doc
    * @param action
    */
-  requestDownstreamAction (doc, action) {
+  requestDownstreamAction (doc: TFNamedNode, action): void {
     var control = this.patchControlFor(doc)
     if (!control.pendingUpstream) {
       action(doc)
@@ -492,27 +492,27 @@ export default class UpdateManager {
    * We want to start counting websocket notifications
    * to distinguish the ones from others from our own.
    */
-  clearUpstreamCount (doc) {
+  clearUpstreamCount (doc: TFNamedNode): void {
     var control = this.patchControlFor(doc)
     control.upstreamCount = 0
   }
 
-  getUpdatesVia (doc) {
+  getUpdatesVia (doc: TFNamedNode): string | null {
     var linkHeaders = this.store.fetcher.getHeader(doc, 'updates-via')
     if (!linkHeaders || !linkHeaders.length) return null
     return linkHeaders[0].trim()
   }
 
-  addDownstreamChangeListener (doc, listener) {
+  addDownstreamChangeListener (doc: TFNamedNode, listener): void {
     var control = this.patchControlFor(doc)
     if (!control.downstreamChangeListeners) { control.downstreamChangeListeners = [] }
     control.downstreamChangeListeners.push(listener)
-    this.setRefreshHandler(doc, (doc) => {
+    this.setRefreshHandler(doc, (doc: TFNamedNode) => {
       this.reloadAndSync(doc)
     })
   }
 
-  reloadAndSync (doc) {
+  reloadAndSync (doc: TFNamedNode): void {
     var control = this.patchControlFor(doc)
     var updater = this
 
@@ -574,7 +574,7 @@ export default class UpdateManager {
    *
    * @returns {boolean}
    */
-  setRefreshHandler (doc, handler) {
+  setRefreshHandler (doc: TFNamedNode, handler): boolean {
     var wssURI = this.getUpdatesVia(doc) // relative
     // var kb = this.store
     var theHandler = handler
@@ -709,7 +709,7 @@ export default class UpdateManager {
       if (ds.length === 0 && is.length === 0) {
         return callback(null, true) // success -- nothing needed to be done.
       }
-      var doc = ds.length ? ds[0].why : is[0].why
+      var doc = ds.length ? ds[0].graph : is[0].graph
       if (!doc) {
         let message = 'Error patching: statement does not specify which document to patch:' + ds[0] + ', ' + is[0]
         console.log(message)
@@ -722,10 +722,10 @@ export default class UpdateManager {
       var verbs = ['insert', 'delete']
       var clauses = { 'delete': ds, 'insert': is }
       verbs.map(function (verb) {
-        clauses[verb].map(function (st) {
-          if (!doc.equals(st.why)) {
+        clauses[verb].map(function (st: TFQuad) {
+          if (!doc.equals(st.graph)) {
             throw new Error('update: destination ' + doc +
-              ' inconsistent with delete quad ' + st.why)
+              ' inconsistent with delete quad ' + st.graph)
           }
           props.map(function (prop) {
             if (typeof st[prop] === 'undefined') {
@@ -912,7 +912,7 @@ export default class UpdateManager {
    * @param is
    * @param callbackFunction
    */
-  updateLocalFile (doc, ds, is, callbackFunction) {
+  updateLocalFile (doc: TFNamedNode, ds, is, callbackFunction): void {
     const kb = this.store
     console.log('Writing back to local file\n')
     // See http://simon-jung.blogspot.com/2007/10/firefox-extension-file-io.html
@@ -976,15 +976,11 @@ export default class UpdateManager {
   }
 
   /**
-   * @param uri {string}
-   * @param data {string|Array<Statement>}
-   * @param contentType {string}
-   *
    * @throws {Error} On unsupported content type
    *
    * @returns {string}
    */
-  serialize (uri, data, contentType) {
+  serialize (uri: string, data: string | TFQuad[], contentType: string): string {
     const kb = this.store
     let documentString
 
@@ -1071,7 +1067,7 @@ export default class UpdateManager {
    * @param doc {NamedNode}
    * @param callbackFunction
    */
-  reload (kb, doc: TFNamedNode, callbackFunction) {
+  reload (kb, doc: TFNamedNode, callbackFunction): void {
     var startTime = Date.now()
     // force sets no-cache and
     const options = { force: true, noMeta: true, clearPreviousData: true }
