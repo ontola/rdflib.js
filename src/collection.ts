@@ -70,6 +70,7 @@ export default class Collection extends Node {
    * Gets a new Collection with the substituting bindings applied
    * @param bindings The bindings to substitute
    */
+  //@ts-ignore Incompatible signature with Node.substitute
   substitute(bindings: Bindings): Collection {
     var elementsCopy = this.elements.map(function (ea) {
       ea.substitute(bindings)

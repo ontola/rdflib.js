@@ -46,7 +46,7 @@ export interface DataFactory<
   toNQ(term: FactoryTypes): string
 }
 
-export type TFIDFactoryTypes = TFNamedNode | TFBlankNode | TFLiteral | TFQuad
+export type TFIDFactoryTypes = TFNamedNode | TFBlankNode | TFLiteral | TFQuad | TFTerm
 
 export interface IdentityFactory<
   Quad = TFQuad,

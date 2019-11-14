@@ -120,6 +120,7 @@ function variable(name?: string): Variable {
   return new Variable(name)
 }
 
+/** The internal RDFlib datafactory, which uses Collections  */
 const CanonicalDataFactory: TFDataFactory<
   NamedNode,
   BlankNode,

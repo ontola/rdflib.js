@@ -34,7 +34,7 @@ import rdfParse from './parse'
 import { parseRDFaDOM } from './rdfaparser'
 import RDFParser from './rdfxmlparser'
 import * as Uri from './uri'
-import { isTFNamedNode, isCollection, uriCreator } from './utils'
+import { isTFNamedNode, isCollection, nodeValue } from './utils'
 import * as Util from './util'
 import serialize from './serialize'
 
@@ -180,7 +180,7 @@ interface AutoInitOptions extends RequestInit{
   // Like requeststatus? Can contain text with error.
   data?: string
   // Probably an identifier for request?s
-  req?: TFBlankNode
+  req: TFBlankNode
   // Might be the same as Options.data
   body?: string
   headers: Headers
@@ -914,7 +914,7 @@ export default class Fetcher {
       )
     }
 
-    let docuri = uriCreator(uri as NamedNode)
+    let docuri = nodeValue(uri as NamedNode)
     docuri = docuri.split('#')[0]
 
     options = this.initFetchOptions(docuri, options)
@@ -922,12 +922,6 @@ export default class Fetcher {
     return this.pendingFetchPromise(docuri, (options as AutoInitOptions).baseURI, options)
   }
 
-  /**
-   * @param uri {string}
-   * @param originalUri {string}
-   * @param options {Object}
-   * @returns {Promise<Result>}
-   */
   pendingFetchPromise (
     uri: string,
     originalUri: string,
@@ -1009,7 +1003,7 @@ export default class Fetcher {
     }
     options.actualProxyURI = actualProxyURI
 
-    return options
+    return options as AutoInitOptions
   }
 
   /**
@@ -1139,7 +1133,7 @@ export default class Fetcher {
     userCallback?: UserCallback,
     options: Options = {}
   ): void {
-    const uri = uriCreator(uriIn)
+    const uri = nodeValue(uriIn)
 
     if (typeof p2 === 'function') {
       // nowOrWhenFetched (uri, userCallback)
@@ -1371,7 +1365,7 @@ export default class Fetcher {
   putBack (
     uri: TFNamedNode | string,
     options: Options = {}
-  ): Promise<Response> {
+  ): Promise<ResponseType> {
     uri = (uri as TFNamedNode).value || uri // Accept object or string
     let doc = new NamedNode(uri).doc() // strip off #
     options.contentType = options.contentType || 'text/turtle'
@@ -1495,9 +1489,9 @@ export default class Fetcher {
     method: HTTPMethods,
     uriIn: string | TFNamedNode,
     // Not sure about this type. Maybe this Options is different?
-    options: Options
+    options: Options = {}
   ): Promise<ResponseType> {
-    const uri = uriCreator(uriIn)
+    const uri = nodeValue(uriIn)
     options.method = method
     options.body = options.data || options.body
     options.force = true

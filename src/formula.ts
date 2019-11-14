@@ -1,4 +1,3 @@
-import BlankNode from './blank-node'
 import ClassOrder from './class-order'
 import Collection from './collection'
 import CanonicalDataFactory from './data-factory-internal'
@@ -8,7 +7,7 @@ import Namespace from './namespace'
 import Node from './node-internal'
 import Serializer from './serialize'
 import Statement from './statement'
-import { appliedFactoryMethods, arrayToStatements, isTFStatement, uriCreator, isStatement } from './utils'
+import { appliedFactoryMethods, arrayToStatements, isTFStatement, nodeValue } from './utils'
 import {
   TFTerm,
   TFPredicate,
@@ -37,7 +36,7 @@ export interface FormulaOpts {
   rdfFactory?: IdentityFactory & DataFactory
 }
 
-interface SeedsMap {
+interface BooleanMap {
   [uri: string]: boolean;
 }
 
@@ -409,7 +408,7 @@ export default class Formula extends Node {
     var len4: number
     var m: number
     var members: MembersMap
-    var pred: TFTerm
+    var pred: TFPredicate
     var q: number
     var ref
     var ref1: TFQuad[]
@@ -438,7 +437,7 @@ export default class Formula extends Node {
         this.sym('http://www.w3.org/2000/01/rdf-schema#domain'),
         this.fromNT(t))
       for (l = 0, len1 = ref2.length; l < len1; l++) {
-        pred = ref2[l]
+        pred = ref2[l] as TFPredicate
         ref3 = this.statementsMatching(void 0, pred)
         for (m = 0, len2 = ref3.length; m < len2; m++) {
           st = ref3[m]
@@ -449,7 +448,7 @@ export default class Formula extends Node {
         this.sym('http://www.w3.org/2000/01/rdf-schema#range'),
         this.fromNT(t))
       for (q = 0, len3 = ref4.length; q < len3; q++) {
-        pred = ref4[q]
+        pred = ref4[q] as TFPredicate
         ref5 = this.statementsMatching(void 0, pred)
         for (u = 0, len4 = ref5.length; u < len4; u++) {
           st = ref5[u]
@@ -471,7 +470,7 @@ export default class Formula extends Node {
    */
   findMemberURIs(
     subject: Node
-  ): MembersMap {
+  ): UriMap {
     return this.NTtoURI(this.findMembersNT(subject))
   }
 
@@ -526,9 +525,7 @@ export default class Formula extends Node {
    */
   findTypesNT(
     subject: TFSubject
-  ): {
-      [uri: string]: boolean;
-  } {
+  ): BooleanMap {
     var domain: TFTerm
     var i: number
     var l: number
@@ -585,9 +582,7 @@ export default class Formula extends Node {
    */
   findTypeURIs(
     subject: TFSubject
-  ): {
-      [uri: string]: string;
-  } {
+  ): UriMap {
     return this.NTtoURI(this.findTypesNT(subject))
   }
 
@@ -602,12 +597,12 @@ export default class Formula extends Node {
     subject: TFSubject,
     doc: TFGraph,
     excludePredicateURIs: ReadonlyArray<string>
-  ): Statement[] {
+  ): TFQuad[] {
     excludePredicateURIs = excludePredicateURIs || []
     var todo: TFSubject[] = [subject]
     var done: any[] = []
     var doneArcs = []
-    var result: Statement[] = []
+    var result: TFQuad[] = []
     var self = this
     var follow = function (x) {
       var queue = function (x) {
@@ -618,9 +613,9 @@ export default class Formula extends Node {
       }
       var sts = self.statementsMatching(null, null, x, doc)
         .concat(self.statementsMatching(x, null, null, doc))
-      sts = sts.filter(function (st: Statement) {
+      sts = sts.filter(function (st: TFQuad): boolean {
         if (excludePredicateURIs[st.predicate.value]) return false
-        var hash = st.toNT()
+        var hash = (st as Statement).toNT()
         if (doneArcs[hash]) return false
         doneArcs[hash] = true
         return true
@@ -767,7 +762,7 @@ export default class Formula extends Node {
    * @return a collection of the URIs as strings
    * todo: explain why it is important to go through NT
    */
-  NTtoURI(t: MembersMap): UriMap{
+  NTtoURI(t: BooleanMap | MembersMap): UriMap{
     var k, v
     var uris: UriMap = {}
     for (k in t) {
@@ -839,7 +834,7 @@ export default class Formula extends Node {
     if (name) {
       throw new Error('This feature (kb.sym with 2 args) is removed. Do not assume prefix mappings.')
     }
-    const uriString = uriCreator(uri)
+    const uriString = nodeValue(uri)
     return this.rdfFactory.namedNode(uriString)
   }
 
@@ -872,7 +867,7 @@ export default class Formula extends Node {
    * @param inverse - Trace inverse direction
    */
   transitiveClosure(
-    seeds: SeedsMap,
+    seeds: BooleanMap,
     predicate: TFPredicate,
     inverse?: boolean
   ): {
@@ -892,7 +887,9 @@ export default class Formula extends Node {
       if (t == null) {
         return done
       }
-      sups = inverse ? this.each(void 0, predicate, this.fromNT(t)) : this.each(this.fromNT(t), predicate)
+      sups = inverse ?
+        this.each(void 0, predicate, this.fromNT(t))
+        : this.each(this.fromNT(t) as TFPredicate, predicate)
       for (i = 0, len = sups.length; i < len; i++) {
         elt = sups[i]
         s = elt.toNT()

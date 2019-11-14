@@ -86,10 +86,11 @@ export default function parse (
 
   function executeErrorCallback (e: Error): void {
     if (
+      // TODO: Always true, what is the right behavior
       contentType !== ContentType.jsonld ||
-      //@ts-ignore always true?
+      // @ts-ignore always true?
       contentType !== ContentType.nQuads ||
-      //@ts-ignore always true?
+      // @ts-ignore always true?
       contentType !== ContentType.nQuadsAlt
     ) {
       if (callback) {

@@ -106,7 +106,7 @@ export function isTFGraph(obj: any): obj is TFGraph {
 }
 
 /** Converts NamedNodes to URI strings */
-export function uriCreator(input: TFNamedNode | string): string {
+export function nodeValue(input: TFNamedNode | string): string {
   if (isTFNamedNode(input)) {
     return input.value
   }

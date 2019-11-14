@@ -20,7 +20,7 @@
 import ClassOrder from './class-order'
 import { defaultGraphURI } from './data-factory-internal'
 import Formula, { FormulaOpts } from './formula'
-import { ArrayIndexOf, isTFStatement, isStore, uriCreator, isTFSubject, isTFPredicate, isTFObject, isTFGraph, isStatement } from './utils'
+import { ArrayIndexOf, isTFStatement, isStore, nodeValue, isTFSubject, isTFPredicate, isTFObject, isTFGraph, isStatement } from './utils'
 import Node from './node'
 import Variable from './variable'
 import { Query, indexedFormulaQuery } from './query'
@@ -123,6 +123,8 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   ]
   features: FeaturesType
   static handleRDFType: Function
+  _universalVariables?: TFNamedNode[]
+  _existentialVariables?: TFBlankNode[]
 
   /**
    * Creates a new formula
@@ -190,7 +192,8 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   applyPatch(
     patch: {
         delete?: ReadonlyArray<Statement>,
-        patch?: ReadonlyArray<Statement>
+        patch?: ReadonlyArray<Statement>,
+        where?: unknown
     },
     target: NamedNode,
     patchCallback: (errorString: string) => void
@@ -224,7 +227,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
           // console.log('despite ' + targetKB.statementsMatching(bad[0].subject, bad[0].predicate)[0])
           return patchCallback('Could not find to delete: ' + bad.join('\n or '))
         }
-        ds2.map(function (st) {
+        ds2.map(function (st: TFQuad) {
           targetKB.remove(st)
         })
       }
@@ -245,8 +248,9 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
       var query = new Query('patch')
       query.pat = patch.where
       query.pat.statements.map(function (st) {
-        st.why = target
+        st.graph = target
       })
+      //@ts-ignore TODO: add sync property to Query
       query.sync = true
 
       var bindingsFound = []
@@ -276,7 +280,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    *
    * @param x The blank node to be declared, supported in N3
    */
-  declareExistential(x: Node): Node {
+  declareExistential(x: TFBlankNode): TFBlankNode {
     if (!this._existentialVariables) this._existentialVariables = []
     this._existentialVariables.push(x)
     return x
@@ -580,6 +584,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * Only applicable for IndexedFormula, but TypeScript won't allow a subclass to override a property
    * @param features The list of features
    */
+  //@ts-ignore Incompatible signature with Formula.formula
   formula(features: FeaturesType): IndexedFormula {
     return new IndexedFormula(features)
   }
@@ -666,13 +671,12 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     return done
   }
 
-
   /**
    * Creates a new universal node
    * Universals are Variables
    * @param uri An URI
    */
-  newUniversal(uri: string): TFTerm {
+  newUniversal(uri: string): TFNamedNode {
     var x = this.sym(uri)
     if (!this._universalVariables) this._universalVariables = []
     this._universalVariables.push(x)
@@ -751,7 +755,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     if (isStore(st)) {
       return this.remove(st.statements)
     }
-    var sts = this.statementsMatching(st.subject, st.predicate, st.object, st.why)
+    var sts = this.statementsMatching(st.subject, st.predicate, st.object, st.graph)
     if (!sts.length) {
       throw new Error('Statement to be removed is not on store: ' + st)
     }
@@ -792,7 +796,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     // The fact is, this.statementsMatching returns this.whyIndex instead of a copy of it
     // but for perfromance consideration, it's better to just do that
     // so make a copy here.
-    var statements = []
+    var statements: TFQuad[] = []
     for (var i = 0; i < sts.length; i++) statements.push(sts[i])
     if (limit) statements = statements.slice(0, limit)
     for (i = 0; i < statements.length; i++) this.remove(statements[i])
@@ -854,7 +858,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   /**
    * Replace big with small, obsoleted with obsoleting.
    */
-  replaceWith (big: TFTerm, small: TFTerm) {
+  replaceWith (big: TFTerm, small: TFTerm): boolean {
     // log.debug("Replacing "+big+" with "+small) // this.id(@@
     var oldhash = this.id(big)
     var newhash = this.id(small)

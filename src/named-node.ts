@@ -1,7 +1,7 @@
 import ClassOrder from './class-order'
 import Node from './node-internal'
 import { ValueType, TFNamedNode, TermType, NamedNodeTermType } from './types';
-import { uriCreator } from './utils';
+import { nodeValue } from './utils';
 
 export function isNamedNode<T>(value: T | Node): value is NamedNode {
   return (value as Node).termType === TermType.NamedNode
@@ -10,6 +10,7 @@ export function isNamedNode<T>(value: T | Node): value is NamedNode {
 /**
 * A named (IRI) RDF node
 */
+//@ts-ignore incompatible signatures for .fromValue
 export default class NamedNode extends Node implements TFNamedNode {
   static termType: NamedNodeTermType;
 
@@ -23,7 +24,7 @@ export default class NamedNode extends Node implements TFNamedNode {
     super()
     this.termType = TermType.NamedNode
 
-    const iri = uriCreator(iriIn)
+    const iri = nodeValue(iriIn)
 
     if (!iri) {
       throw new Error('Missing IRI for NamedNode')
@@ -71,7 +72,8 @@ export default class NamedNode extends Node implements TFNamedNode {
    }
 
   /**
-   * Gets the named node for the document
+   * Gets the fetchable named node for the document.
+   * Removes everything from the # anchor tag.
    */
   doc (): NamedNode {
     if (this.uri.indexOf('#') < 0) {
