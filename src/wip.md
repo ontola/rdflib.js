@@ -40,23 +40,25 @@ Builds upon the approved #363 PR for [typescript migration](https://github.com/l
 - Converted `kb.add(someString)` to `kb.add(new Namednode(somestring))` to enhance compatibility with other datafactories. This happens in `Fetcher` and
 - `Fetcher.refreshIfExpired` passed an array of headers, but it needs only one string.
 - `Fethcer` uses `Headers` a lot. I've changed empty objects to empty `new Headers` instances, which enhances compatibility with default `Fetch` behavior.
+- `Serializer.tripleCallback` had an unused third argument.
 
 ## Possible bugs not fixed by this PR
 
-- The `Parse.executeErrorCallback` conditional logic is always `true`.
 - `Formula.substitute` uses `this.add(Statments[])`, which will crash. I think it should be removed, since `IndexedFormula.substitute` is used all the time anyway.
 - The `Formula.serialize` function calls `serialize.ts` with only one argument, so without a store. I think this will crash every time. Also`Formula.serialize` uses `this.namespaces`, but this is only defined in `IndexedFormula`. Is it rotten code and should it be removed?
 - `store.add()` accepts many types of inputs, but this will lead to invalid statements (e.g. a Literal as a Subject). I suggest we make this more strict and throw more errors on wrong inputs. Relates to #362. We could still make the allowed inputs bigger by allowing other types with some explicit behavior, e.g. in subject arguments, create `NamedNodes` from `URL` objects and `strings` that look like URLs . In any case, I thinkg the `Node.fromValue` behavior is too unpredictable for `store.add`. For now, I've updated the docs to match its behavior.
 - The types for `Node.fromValue` and `Literal.fromValue` show how unpredictable these methods are. I suggest we make them more strict (also relates to #362), so they either return a `TFTerm` (`node`) or throw an error - they should not return `undefined` or `null`. Also, I think they should be converted to functions in `Utils`: this would fix the circular dependency issue (why we need `node_internal`) and it would fix the type issues in `Literal.fromValue` (which tends to give issues since it's signature does not correctly extend from `Node.fromValue`)
 - In `Fetcher.addtype`, the final logic will allways return `true`, since `redirection` is a `NamedNode`. Should it call `.value`?
 - The `defaultGraph` iri is set to `chrome:theSession`, but this errors in Firefox. I suggest we change it to something else. See #370.
+- The `Parse.executeErrorCallback` conditional logic is always `true`.
+- Many `// @ts-ignore` comments for possible bugs.
 
 ## Unused code
 
 - `IndexedFormula.predicateCallback` is checked, but never used in this codebase.
 - The `optional` argument in `formula.js` does not seem to be documented, used or tested - should it be removed?
 
-## Other things I noticed:
+## Other things I noticed
 
 - Literals can apparently be `null` or `undefined`, when nodes are created using the `.fromValue` method. This causes faulty behavior. This happens in the `new Statement()` constructor as well. See #362.
 - The `IndexedFormula.add()` method has logic for Statement array inputs and store inputs, but this behavior is not documented. It also refers to `this.fetcher` and `this.defaultGraph`, which both should not be available.
@@ -64,10 +66,14 @@ Builds upon the approved #363 PR for [typescript migration](https://github.com/l
 - Aliases (e.g. `IndexedFormula.match` for `IndexefFormula.statementsMatching`) introduce complexity, documentation and type duplication. I suggest adding deprecation warnings.
 - The various calling methods of `Fetcher.nowOrWhenFetched` are quite dynamic. A simpler, stricter input type might be preferable.
 - The Variable type (or `TFVariable`) really messes with some assumptions. I feel like they should not be valid in regular quads, since it's impossible to serialize them decently. If I'd add it to the accepted types, we'd require a lot of typeguards in functions.
-- `Fetcher` `StatusValues` can be many types in RDFlib: string, number, true, undefined... This breaks compatibility with extending `Response` types, since these only use numbers. I feel we should only use the `499` browser error and add the text message to the `requestbody`. I've created a type for the internal `InternalResponse`; it shows how it differs from a regular `Response`.
+- `Fetcher` `StatusValues` can be many types in RDFlib: string, number, true, undefined... This breaks compatibility with extending `Response` types, since these only use numbers. I feel we should only use the `499` browser error and add the text message to the `requestbody`. I've created a type for the internal `InternalResponse`; it shows how it differs from a regular `Response`. The `.responseText` property, for example, is used frequently in Fetcher, but
 - The `IndexedFormula` and `Formula` methods have incompatible types, such as in `compareTerm`, `variable` and `add`. I've added `//@ts-ignore` lines with comments.
+- The fourth `reponse` argument in `.parse()` methods in `Handler` classes was unused (except in N3Handler), so I removed it everywhere it was unused.
 - `Serializer`'s fourth `options` argument is undocumented, and I couldn't find out how it worked.
 - `Fetcher` `saveResponseMetadata` creates literals
+- Many functions in `Fetcher` assume that specific `Opts` are defined. I've included all these in a single `Options` type and added documentation for the props I understood. I've also created an `AutoInitOptions` type, which sets auto-initialized. I extended Options in each function where specific opts seemed to be required. I'm not entirely confident about the types I've set. I feel like the truly required items should never be `Opts`, since they aren't optional. Refactoring this requires a seperate PR.
+- `Fetcher.load` allows arrays as inputs. This causes the output types to be more unpredictable. `Promise<Result> | Result[]`. I suggest splitting this in two functions, e.g. add `loadMany`
+- `Utils.callbackify` seems to be used only in `Fetcher`.
 
 ## Some thoughts on simplifying language
 
@@ -83,4 +89,3 @@ Therefore, we should try to use consistent langauge and keep synonyms to a minim
 ## Probably OK, but I don't get it:
 
 - I'm a bit embarassed about this, but even after rewriting so much of the code I still don't understand all methods. E.g. `Forumla.transitiveClosure()`
-- Some functions in `Fetcher` assume that specific `Opts` are defined. I've included all these in a single `Options` type (and an `AutoInitOptions` type which sets auto-initialized opts), and extended this type in each function where specific opts seemed to be required. I'm not entirely confident about the types I've set.

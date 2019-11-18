@@ -41,7 +41,6 @@ import serialize from './serialize'
 import { fetch as solidAuthCli } from 'solid-auth-cli'
 import { fetch as solidAuthClient } from 'solid-auth-client'
 import { TFBlankNode, TFNamedNode, TFTerm, TFGraph, TFSubject, ContentType } from './types'
-import { Formula } from './index'
 import Literal from './literal'
 
 // This is a special fetch which does OIDC auth, catching 401 errors
@@ -86,21 +85,15 @@ const ns = {
 interface FetchError extends Error {
   statusText?: string
   status?: StatusValues
-  response?: ResponseType
+  response?: ExtendedResponse
 }
 
-// Both Fetch like Response objects as InternalResponse types are allowed
-type ResponseType = Response | InternalResponse | Partial<Response>
-
-/** Internal type for Responses. Resembles the Response type for .fetch() */
-interface InternalResponse {
-  /** Originally, this just allows numbers, but RDFLib also uses other status types */
-  status?: StatusValues
-  /** The request meta blank node */
-  req?: TFNamedNode
-  statusText?: string
+/** An extended interface of Response, since RDFlib.js adds some properties. */
+interface ExtendedResponse extends Response {
+  /** String representation of the Body */
   responseText?: string
-  url?: string
+  /** Identifier of the reqest */
+  req?: TFSubject
   size?: number
   timeout?: number
 }
@@ -189,12 +182,12 @@ interface AutoInitOptions extends RequestInit{
 
 class Handler {
   // TODO: Document, type
-  response: ResponseType
+  response: ExtendedResponse
   // TODO: Document, type
   dom: Document
   static pattern: RegExp
 
-  constructor (response: ResponseType, dom?: Document) {
+  constructor (response: ExtendedResponse, dom?: Document) {
     this.response = response
     // The bang operator here might need to be removed.
     this.dom = dom!
@@ -219,6 +212,7 @@ class RDFXMLHandler extends Handler {
     /** Requires .original */
     options: {
       original: TFSubject
+      req: TFSubject
     } & Options,
   ) {
     let kb = fetcher.store
@@ -263,7 +257,7 @@ class XHTMLHandler extends Handler {
       resource: TFSubject
       original: TFSubject
     } & Options,
-  ): Promise<FetchError> | ResponseType {
+  ): Promise<FetchError> | ExtendedResponse {
     let relation, reverse: boolean
     if (!this.dom) {
       this.dom = Util.parseXML(responseText)
@@ -298,9 +292,9 @@ class XHTMLHandler extends Handler {
     for (let i = 0; i < scripts.length; i++) {
       let contentType = scripts[i].getAttribute('type')
       if (Parsable[contentType!]) {
-        //@ts-ignore incompatibility between Store.add and Formula.add
+        // @ts-ignore incompatibility between Store.add and Formula.add
         rdfParse(scripts[i].textContent as string, kb, options.original.value, contentType)
-        //@ts-ignore incompatibility between Store.add and Formula.add
+        // @ts-ignore incompatibility between Store.add and Formula.add
         rdfParse(scripts[i].textContent as string, kb, options.original.value, contentType)
       }
     }
@@ -315,11 +309,11 @@ class XHTMLHandler extends Handler {
       } catch (err) {
         let msg = 'Error trying to parse ' + options.resource + ' as RDFa:\n' +
           err + ':\n' + err.stack
-        return fetcher.failFetch(options, msg, 'parse_error')
+        return fetcher.failFetch(options as AutoInitOptions, msg, 'parse_error')
       }
     }
 
-    return fetcher.doneFetch(options, this.response)
+    return fetcher.doneFetch(options as AutoInitOptions, this.response)
   }
 }
 XHTMLHandler.pattern = new RegExp('application/xhtml')
@@ -342,7 +336,7 @@ class XMLHandler extends Handler {
       req: TFBlankNode
       resource: TFSubject
     } & Options,
-  ): ResponseType | Promise<FetchError> {
+  ): ExtendedResponse | Promise<FetchError> {
     let dom = Util.parseXML(responseText)
 
     // XML Semantics defined by root element namespace
@@ -421,11 +415,11 @@ class HTMLHandler extends Handler {
     fetcher: Fetcher,
     responseText: string,
     options: {
-      req: TFSubject,
+      req: TFBlankNode,
       resource: TFSubject,
       original: TFSubject,
     } & Options
-  ): Promise<FetchError> | ResponseType {
+  ): Promise<FetchError> | ExtendedResponse {
     let kb = fetcher.store
 
     // We only handle XHTML so we have to figure out if this is XML
@@ -490,7 +484,7 @@ class TextHandler extends Handler {
       original: TFSubject
       resource: TFSubject
     } & Options
-  ): ResponseType | Promise<FetchError> {
+  ): ExtendedResponse | Promise<FetchError> {
     // We only speak dialects of XML right now. Is this XML?
 
     // Look for an XML declaration
@@ -545,10 +539,9 @@ class N3Handler extends Handler {
     options: {
       original: TFNamedNode
       req: TFSubject
-    }
-    & Options,
-    response: ResponseType
-  ): ResponseType | Promise<FetchError> {
+    } & Options,
+    response: ExtendedResponse
+  ): ExtendedResponse | Promise<FetchError> {
     // Parse the text of this N3 file
     let kb = fetcher.store
     let p = N3Parser(kb, kb, options.original.value, options.original.value,
@@ -608,6 +601,8 @@ type StatusValues =
   404 |
   /** In attempt to counter CORS problems retried */
   'redirected' |
+  /** If it did fail */
+  'failed' |
   'parse_error' |
   /**
    * URI is not a protocol Fetcher can deal with
@@ -633,27 +628,27 @@ interface TimeOutsMap {
   [uri: string]: NodeJS.Timeout[]
 }
 
-interface RedirectedToMap {
-  [uri: string]: string
-}
-
 interface FetchQueue {
-  [uri: string]: Promise<ResponseType>
+  [uri: string]: Promise<ExtendedResponse>
 }
 
 interface FetchCallbacks {
-  [uri: string]: Function[]
+  [uri: string]: UserCallback[]
 }
 
 interface BooleanMap {
   [uri: string]: boolean
 }
 
-// Not sure about the shapes of this. Response? Strin?
-type Result = ResponseType
+// Not sure about the shapes of this. Response? FetchError?
+type Result = Response
 
 /** Differs from normal Fetch, has an extended Response type */
-type Fetch = (input: RequestInfo, init?: RequestInit) => Promise<ResponseType>;
+type Fetch = (input: RequestInfo, init?: RequestInit) => Promise<ExtendedResponse>;
+
+interface CallbackifyInterface {
+  fireCallbacks: Function
+}
 
 /** Fetcher
  *
@@ -663,7 +658,7 @@ type Fetch = (input: RequestInfo, init?: RequestInit) => Promise<ResponseType>;
   * figuring how to parse them.  It will also refresh, remove, the data
   * and put back the fata to the web.
  */
-export default class Fetcher {
+export default class Fetcher implements CallbackifyInterface {
   store: IndexedFormula
   timeout: number
   _fetch: Fetch
@@ -686,8 +681,8 @@ export default class Fetcher {
   requested: RequestedMap
   /** List of timeouts associated with a requested URL */
   timeouts: TimeOutsMap
-  /** When 'redirected' */
-  redirectedTo: RedirectedToMap
+  /** Redirected from *key uri* to *value uri* */
+  redirectedTo: Record<string, string>
   fetchQueue: FetchQueue
   /** fetchCallbacks[uri].push(callback) */
   fetchCallbacks: FetchCallbacks
@@ -698,8 +693,12 @@ export default class Fetcher {
   static HANDLERS: {
     [handlerName: number]: Handler
   }
+  static CONTENT_TYPE_BY_EXT: Record<string, string>
   // TODO: Document this
   static crossSiteProxyTemplate: any
+
+  /** Methods added by calling Util.callbackify in the constructor*/
+  fireCallbacks!: Function
 
   constructor (
     store: IndexedFormula,
@@ -906,7 +905,7 @@ export default class Fetcher {
   load (
     uri: TFNamedNode | string | Array<string | TFNamedNode>,
     options: Options = {}
-  ): Promise<Result> {
+  ): Promise<Result> | Result[] {
     options = Object.assign({}, options) // Take a copy as we add stuff to the options!!
     if (uri instanceof Array) {
       return Promise.all(
@@ -925,7 +924,7 @@ export default class Fetcher {
   pendingFetchPromise (
     uri: string,
     originalUri: string,
-    options: Options
+    options: AutoInitOptions
   ): Promise<Result> {
     let pendingPromise
 
@@ -1016,8 +1015,8 @@ export default class Fetcher {
    */
   fetchUri (
     docuri: string,
-    options: Options
-  ): Promise<ResponseType | FetchError> | ResponseType {
+    options: AutoInitOptions
+  ): Promise<ExtendedResponse | FetchError> {
     if (!docuri) {
       return Promise.reject(new Error('Cannot fetch an empty uri'))
     }
@@ -1031,6 +1030,7 @@ export default class Fetcher {
     if (!options.force) {
       if (state === 'fetched') {  // URI already fetched and added to store
         return Promise.resolve(
+          // @ts-ignore This is not a valid response object
           this.doneFetch(options, {
             status: 200,
             ok: true,
@@ -1040,7 +1040,8 @@ export default class Fetcher {
       }
       if (state === 'failed' && this.requested[docuri] === 404) { // Remember nonexistence
         let message = 'Previously failed: ' + this.requested[docuri]
-        let dummyResponse: ResponseType = {
+        // @ts-ignore This is not a valid response object
+        let dummyResponse: ExtendedResponse = {
           url: docuri,
           // This does not comply to Fetch spec, it can be a string value in rdflib
           status: this.requested[docuri] as number,
@@ -1071,12 +1072,12 @@ export default class Fetcher {
 
     let { actualProxyURI } = options
 
-    //@ts-ignore
-    return this._fetch(actualProxyURI, options)
+    return this._fetch((actualProxyURI as string), options)
       .then(response => this.handleResponse(response, docuri, options),
       error => { // @@ handleError?
-        let dummyResponse = {
-          url: actualProxyURI,
+        // @ts-ignore Invalid response object
+        let dummyResponse: ExtendedResponse = {
+          url: actualProxyURI as string,
           status: 999, // @@ what number/string should fetch failures report?
           statusText: (error.name || 'network failure') + ': ' +
             (error.errno || error.code || error.type),
@@ -1148,8 +1149,8 @@ export default class Fetcher {
       options = p2
     }
 
-    this.load(uri, options)
-      .then((fetchResponse: ResponseType) => {
+    (this.load(uri, options) as Promise<Response>)
+      .then((fetchResponse: ExtendedResponse) => {
         if (userCallback) {
           if (fetchResponse) {
             if ((fetchResponse as Response).ok) {
@@ -1157,8 +1158,8 @@ export default class Fetcher {
             } else {
               // console.log('@@@ fetcher.js Should not take this path !!!!!!!!!!!!')
               let oops = 'HTTP error: Status ' + fetchResponse.status + ' (' + fetchResponse.statusText + ')'
-              if ((fetchResponse as InternalResponse).responseText) {
-                oops += ' ' + (fetchResponse as InternalResponse).responseText // not in 404, dns error, nock failure
+              if (fetchResponse.responseText) {
+                oops += ' ' + fetchResponse.responseText // not in 404, dns error, nock failure
               }
               console.log(oops + ' fetching ' + uri)
               userCallback(false, oops, fetchResponse)
@@ -1214,12 +1215,12 @@ export default class Fetcher {
    */
   failFetch (
     options: {
-      req: TFSubject
+      req: TFBlankNode
       original: TFSubject
     } & Options,
     errorMessage: string,
     statusCode: StatusValues,
-    response?: ResponseType
+    response?: ExtendedResponse
   ): Promise<FetchError> {
     this.addStatus(options.req, errorMessage)
 
@@ -1329,14 +1330,14 @@ export default class Fetcher {
       req: TFSubject,
       original: TFSubject
     } & Options,
-    response: ResponseType
-  ): ResponseType {
+    response: ExtendedResponse
+  ): Response {
     this.addStatus(options.req, 'Done.')
     this.requested[options.original.value] = 'done'
 
     this.fireCallbacks('done', [options.original.value])
 
-    (response as InternalResponse).req = options.req  // Set the request meta blank node
+    response.req = options.req  // Set the request meta blank node
 
     return response
   }
@@ -1365,7 +1366,7 @@ export default class Fetcher {
   putBack (
     uri: TFNamedNode | string,
     options: Options = {}
-  ): Promise<ResponseType> {
+  ): Promise<Response> {
     uri = (uri as TFNamedNode).value || uri // Accept object or string
     let doc = new NamedNode(uri).doc() // strip off #
     options.contentType = options.contentType || 'text/turtle'
@@ -1373,7 +1374,7 @@ export default class Fetcher {
     return this.webOperation('PUT', uri, options)
   }
 
-  webCopy (here: string, there: string, contentType): Promise<ResponseType> {
+  webCopy (here: string, there: string, contentType): Promise<ExtendedResponse> {
     return this.webOperation('GET', here)
       .then((result) => {
         return this.webOperation(
@@ -1382,7 +1383,7 @@ export default class Fetcher {
       })
   }
 
-  delete (uri: string, options: Options): Promise<ResponseType> {
+  delete (uri: string, options: Options): Promise<ExtendedResponse> {
     return this.webOperation('DELETE', uri, options)
       .then(response => {
         this.requested[uri] = 404
@@ -1402,7 +1403,7 @@ export default class Fetcher {
     doc: NamedNode,
     contentType = 'text/turtle',
     data = ''
-  ): Promise<ResponseType> {
+  ): Promise<ExtendedResponse> {
     const fetcher = this
     try {
       var response = await fetcher.load(doc)
@@ -1424,7 +1425,7 @@ export default class Fetcher {
       }
     }
     // console.log('createIfNotExists: doc exists, all good: ' + doc)
-    return response
+    return response as Response
   }
 
   /**
@@ -1447,6 +1448,7 @@ export default class Fetcher {
       headers['slug'] = folderName
     }
 
+    // @ts-ignore These headers lack some of the required operators.
     let options: Options = { headers }
 
     if (data) {
@@ -1456,8 +1458,8 @@ export default class Fetcher {
     return this.webOperation('POST', parentURI, options)
   }
 
-  invalidateCache (uri) {
-    uri = uri.value || uri // Allow a NamedNode to be passed as it is very common
+  invalidateCache (uri: string | TFNamedNode): void {
+    uri = nodeValue(uri)
     const fetcher = this
     if (fetcher.fetchQueue && fetcher.fetchQueue[uri]) {
       console.log('Internal error - fetchQueue exists ' + uri)
@@ -1490,7 +1492,7 @@ export default class Fetcher {
     uriIn: string | TFNamedNode,
     // Not sure about this type. Maybe this Options is different?
     options: Options = {}
-  ): Promise<ResponseType> {
+  ): Promise<ExtendedResponse> {
     const uri = nodeValue(uriIn)
     options.method = method
     options.body = options.data || options.body
@@ -1508,13 +1510,13 @@ export default class Fetcher {
 
     return new Promise(function (resolve, reject) {
       fetcher._fetch(uri, options).then(response => {
-        if ((response as Response).ok) {
+        if (response.ok) {
           if (method === 'PUT' || method === 'PATCH' || method === 'POST' || method === 'DELETE') {
             fetcher.invalidateCache (uri)
           }
-          if ((response as Response).body) {
-            (response as Response).text().then(data => {
-              (response as InternalResponse).responseText = data
+          if (response.body) {
+            response.text().then(data => {
+              response.responseText = data
               resolve(response)
             })
           } else {
@@ -1524,7 +1526,7 @@ export default class Fetcher {
           let msg = 'Web error: ' + response.status
           if (response.statusText) msg += ' (' + response.statusText + ')'
           msg += ' on ' + method + ' of <' + uri + '>'
-          if ((response as InternalResponse).responseText) msg += ': ' + (response as InternalResponse).responseText
+          if (response.responseText) msg += ': ' + response.responseText
           let e2: FetchError = new Error(msg)
           e2.response = response
           reject(e2)
@@ -1545,7 +1547,10 @@ export default class Fetcher {
    * @param rterm - the resource which referred to this
    *   (for tracking bad links)
    */
-  lookUpThing (term: TFNamedNode, rterm: TFNamedNode): Promise<string[]> {
+  lookUpThing (
+    term: TFNamedNode,
+    rterm: TFNamedNode
+  ): Promise<Response> | Response[] {
     let uris = this.store.uris(term)  // Get all URIs
     uris = uris.map(u => Uri.docpart(u))  // Drop hash fragments
 
@@ -1591,12 +1596,10 @@ export default class Fetcher {
     return undefined
   }
 
-  /**
-   *
-   * @param docuri
-   * @param options
-   */
-  saveRequestMetadata (docuri: string, options: Options) {
+  saveRequestMetadata (
+    docuri: string,
+    options: AutoInitOptions
+  ) {
     let req = options.req
     let kb = this.store
     let rterm = options.referringTerm
@@ -1731,15 +1734,15 @@ export default class Fetcher {
     delete this.requested[term.value] // So it can be loaded again
   }
 
-  addHandler (handler: RDFXMLHandler) {
+  addHandler (handler: Handler) {
     this.handlers.push(handler)
-    handler.register(this)
+    (handler as N3Handler).register(this)
   }
 
   retryNoCredentials (
     docuri: string,
     options
-  ): void {
+  ): Promise<Result> {
     console.log('Fetcher: CORS: RETRYING with NO CREDENTIALS for ' + options.resource)
 
     options.retriedWithNoCredentials = true // protect against being called twice
@@ -1752,7 +1755,7 @@ export default class Fetcher {
     this.addStatus(options.req,
       'Abort: Will retry with credentials SUPPRESSED to see if that helps')
 
-    return this.load(docuri, newOptions)
+    return this.load(docuri, newOptions) as Promise<Result>
   }
 
   /**
@@ -1767,7 +1770,7 @@ export default class Fetcher {
 
     const hostpart = Uri.hostpart
     const here = '' + document.location
-    return hostpart(here) && hostpart(uri) && hostpart(here) !== hostpart(uri)
+    return (hostpart(here) && hostpart(uri) && hostpart(here)) !== hostpart(uri)
   }
 
   /**
@@ -1775,10 +1778,10 @@ export default class Fetcher {
    * with status of 0.
    */
   handleError (
-    response: ResponseType | Error,
+    response: ExtendedResponse | Error,
     docuri: string,
-    options: Options
-  ): Promise<string | ResponseType> {
+    options: AutoInitOptions
+  ): Promise<ExtendedResponse | FetchError> {
     if (this.isCrossSite(docuri)) {
       // Make sure we haven't retried already
       if (options.credentials && options.credentials === 'include' && !options.retriedWithNoCredentials) {
@@ -1806,20 +1809,20 @@ export default class Fetcher {
     }
 
     // This is either not a CORS error, or retries have been made
-    return this.failFetch(options, message, (response as Response).status || 998, response)
+    return this.failFetch(options, message, (response as Response).status || 998, (response as Response))
   }
 
   // deduce some things from the HTTP transaction
   addType (
     rdfType: TFNamedNode,
     req: TFSubject,
-    kb: Formula,
+    kb: IndexedFormula,
     locURI: string
   ): void { // add type to all redirected resources too
     let prev = req
     if (locURI) {
       var reqURI = kb.any(prev, ns.link('requestedURI'))
-      if (reqURI && reqURI !== locURI) {
+      if (reqURI && reqURI.value !== locURI) {
         kb.add(kb.sym(locURI), ns.rdf('type'), rdfType, this.appNode)
       }
     }
@@ -1834,8 +1837,8 @@ export default class Fetcher {
       if (!response) { break }
       var redirection = kb.any((response as TFNamedNode), kb.sym('http://www.w3.org/2007/ont/http#status'))
       if (!redirection) { break }
-      //@ts-ignore always true?
-      if (redirection !== '301' && redirection !== '302') { break }
+      // @ts-ignore always true?
+      if ((redirection !== '301') && (redirection !== '302')) { break }
     }
   }
 
@@ -1843,10 +1846,10 @@ export default class Fetcher {
    * Handle fetch() response
    */
   handleResponse (
-    response: ResponseType,
+    response: ExtendedResponse,
     docuri: string,
-    options: Options
-  ): Promise<string> {
+    options: AutoInitOptions
+  ): Promise<FetchError | ExtendedResponse> | ExtendedResponse {
     const kb = this.store
     const headers: Headers = (response as Response).headers
 
@@ -1869,7 +1872,7 @@ export default class Fetcher {
 
     if (response.status >= 400) {
       if (response.status === 404) {
-        this.nonexistent[options.original.uri] = true
+        this.nonexistent[options.original.value] = true
         this.nonexistent[docuri] = true
       }
 
@@ -1881,8 +1884,8 @@ export default class Fetcher {
         })
     }
 
-    var diffLocation = null
-    var absContentLocation = null
+    var diffLocation: null | string = null
+    var absContentLocation: null | string = null
     if (contentLocation) {
       absContentLocation = Uri.join(contentLocation, docuri)
       if (absContentLocation !== docuri) {
@@ -1916,7 +1919,7 @@ export default class Fetcher {
 
     // If we have already got the thing at this location, abort
     if (contentLocation) {
-      if (!options.force && diffLocation && this.requested[absContentLocation] === 'done') {
+      if (!options.force && diffLocation && this.requested[absContentLocation as string] === 'done') {
         // we have already fetched this
         // should we smush too?
         // log.info("HTTP headers indicate we have already" + " retrieved " +
@@ -1924,12 +1927,12 @@ export default class Fetcher {
         return this.doneFetch(options, response)
       }
 
-      this.requested[absContentLocation] = true
+      this.requested[absContentLocation as string] = true
     }
 
-    this.parseLinkHeader(headers.get('link'), options.original, reqNode)
+    this.parseLinkHeader(headers.get('link') as string, options.original, reqNode)
 
-    let handler = this.handlerForContentType(contentType, response)
+    let handler = this.handlerForContentType(contentType, response) as Handler
 
     if (!handler) {
       //  Not a problem, we just don't extract data
@@ -1940,11 +1943,14 @@ export default class Fetcher {
     return response.text()
       .then(responseText => {
         response.responseText = responseText
-        return handler.parse(this, responseText, options, response)
+        return (handler as N3Handler).parse(this, responseText, options, response)
       })
   }
 
-  saveErrorResponse (response: ResponseType, responseNode: TFNamedNode) {
+  saveErrorResponse (
+    response: ExtendedResponse,
+    responseNode: TFSubject
+  ): Promise<void> {
     let kb = this.store
 
     return response.text()
@@ -1955,7 +1961,7 @@ export default class Fetcher {
       })
   }
 
-  handlerForContentType (contentType: string, response: ResponseType): Handler | null {
+  handlerForContentType (contentType: string, response: ExtendedResponse): Handler | null {
     if (!contentType) {
       return null
     }
@@ -1971,7 +1977,10 @@ export default class Fetcher {
     return CONTENT_TYPE_BY_EXT[uri.split('.').pop() as string]
   }
 
-  normalizedContentType (options: Options, headers: Headers): ContentType | string | null {
+  normalizedContentType (
+    options: AutoInitOptions,
+    headers: Headers
+  ): ContentType | string | null {
     if (options.forceContentType) {
       return options.forceContentType
     }
@@ -1985,7 +1994,7 @@ export default class Fetcher {
       }
     }
 
-    let protocol = Uri.protocol(options.resource.value)
+    let protocol = Uri.protocol(options.resource.value) as string
 
     if (!contentType && ['file', 'chrome'].includes(protocol)) {
       return 'text/xml'
@@ -1999,11 +2008,8 @@ export default class Fetcher {
    */
   redirectToProxy (
     newURI: string,
-    options: {
-      req: TFSubject,
-      resource: TFSubject,
-    } & Options
-  ): Promise<ResponseType> {
+    options: AutoInitOptions
+  ): Promise<ExtendedResponse | FetchError> {
     this.addStatus(options.req, 'BLOCKED -> Cross-site Proxy to <' + newURI + '>')
 
     options.proxyUsed = true
@@ -2032,7 +2038,13 @@ export default class Fetcher {
       })
   }
 
-  setRequestTimeout (uri: string, options: Options): Promise<number> {
+  setRequestTimeout (
+    uri: string,
+    options: {
+      req: TFSubject
+      original: TFSubject
+    } & Options
+  ): Promise<number | FetchError> {
     return new Promise((resolve) => {
       this.timeouts[uri] = (this.timeouts[uri] || []).concat(setTimeout(() => {
         if (this.isPending(uri) &&
@@ -2044,7 +2056,10 @@ export default class Fetcher {
     })
   }
 
-  addFetchCallback (uri, callback) {
+  addFetchCallback (
+    uri: string,
+    callback: UserCallback
+  ): void {
     if (!this.fetchCallbacks[uri]) {
       this.fetchCallbacks[uri] = [callback]
     } else {

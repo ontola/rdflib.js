@@ -25,7 +25,7 @@ export function linkRelationProperty(relation){
  * They return true if they want to be called again.
  * @method callbackify
  * @param obj {Object}
- * @param callbacks {Array<Function>}
+ * @param callbacks {Array<string>}
  */
 export function callbackify (obj, callbacks) {
   obj.callbacks = {}

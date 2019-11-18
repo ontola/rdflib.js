@@ -728,7 +728,7 @@ export default class Formula extends Node {
     */
   list(values: [], context: IndexedFormula): Collection | TFBlankNode {
     if (context.rdfFactory.supports["COLLECTIONS"]) {
-      //@ts-ignore if a rdfFactory supports collections, the collection() method should work
+      // @ts-ignore if a rdfFactory supports collections, the collection() method should work
       const collection = context.rdfFactory.collection()
       values.forEach(function (val) {
         collection.append(val)
@@ -786,6 +786,7 @@ export default class Formula extends Node {
     var sts: TFQuad[]
     var sz
     sz = Serializer(this)
+    // @ts-ignore Formula.namespaces does not exist
     sz.suggestNamespaces(this.namespaces)
     sz.setBase(base)
     if (provenance) {
@@ -820,7 +821,7 @@ export default class Formula extends Node {
     })
     console.log('Formula subs statmnts:' + statementsCopy)
     var y = new Formula()
-    // This will throw an error, since this.add() can't handle
+    // @ts-ignore This will throw an error, since Formula.add() can't handle arrays
     y.add(statementsCopy)
     console.log('indexed-form subs formula:' + y)
     return y
