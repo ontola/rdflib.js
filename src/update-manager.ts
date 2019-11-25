@@ -11,15 +11,17 @@ import DataFactory from './data-factory'
 import Namespace from './namespace'
 import Serializer from './serializer'
 import { join as uriJoin } from './uri'
-import { isStore, isNamedNode, isTFBlankNode } from './utils'
+import { isStore, isNamedNode, isTFBlankNode, nodeValue } from './utils'
 import * as Util from './util'
 import Statement from './statement';
 import { NamedNode } from './index'
-import { TFNamedNode, TFQuad } from './types'
+import { TFNamedNode, TFQuad, TFBlankNode, TFSubject } from './types'
 
 interface UpdateManagerFormula extends IndexedFormula {
   fetcher: Fetcher
 }
+
+type CallBackFunction = (uri: string, ok: boolean, message: string, response: Error | Response) => {} | void
 
 /**
 * The UpdateManager is a helper object for a store.
@@ -92,9 +94,7 @@ export default class UpdateManager {
     if (!kb) {
       kb = this.store
     }
-    if (isNamedNode(uri)) {
-      uri = uri.value
-    }
+    uri = nodeValue(uri)
 
     if ((uri as string).slice(0, 8) === 'file:///') {
       if (kb.holds(
@@ -108,7 +108,7 @@ export default class UpdateManager {
 
       console.log('UpdateManager.editable: Not MachineEditableDocument file ' +
         uri + '\n')
-      console.log(sts.map((x) => { return x.toNT() }).join('\n'))
+      console.log(sts.map((x) => { return (x as Statement).toNT() }).join('\n'))
 
       return false
       // @@ Would be nifty of course to see whether we actually have write access first.
@@ -116,6 +116,7 @@ export default class UpdateManager {
 
     var request
     var definitive = false
+     // @ts-ignore passes a string to kb.each, which expects a term. Should this work?
     var requests = kb.each(undefined, this.ns.link('requestedURI'), docpart(uri))
 
     // This if-statement does not follow the Solid spec, but temporarily reverts this change:
@@ -134,7 +135,7 @@ export default class UpdateManager {
     for (var r = 0; r < requests.length; r++) {
       request = requests[r]
       if (request !== undefined) {
-        var response = kb.any(request, this.ns.link('response'))
+        var response = kb.any(request, this.ns.link('response')) as TFSubject
         if (request !== undefined) {
           var wacAllow = kb.anyValue(response, this.ns.httph('wac-allow'))
           if (wacAllow) {
@@ -168,6 +169,7 @@ export default class UpdateManager {
           var status = kb.each(response, this.ns.http('status'))
           if (status.length) {
             for (let i = 0; i < status.length; i++) {
+              // @ts-ignore since statuses should be TFTerms, this should always be false
               if (status[i] === 200 || status[i] === 404) {
                 definitive = true
                 // return false // A definitive answer
@@ -206,10 +208,10 @@ export default class UpdateManager {
    * Returns a list of all bnodes occurring in a statement
    * @private
    */
-  statementBnodes (st: TFQuad) {
+  statementBnodes (st: TFQuad): TFBlankNode[] {
     return [st.subject, st.predicate, st.object].filter(function (x) {
       return isTFBlankNode(x)
-    })
+    }) as TFBlankNode[]
   }
 
   /**
@@ -217,12 +219,12 @@ export default class UpdateManager {
    * @private
    */
   statementArrayBnodes (sts: TFQuad[]) {
-    var bnodes = []
+    var bnodes: TFBlankNode[] = []
     for (let i = 0; i < sts.length; i++) {
       bnodes = bnodes.concat(this.statementBnodes(sts[i]))
     }
     bnodes.sort() // in place sort - result may have duplicates
-    var bnodes2 = []
+    var bnodes2: TFBlankNode[] = []
     for (let j = 0; j < bnodes.length; j++) {
       if (j === 0 || !bnodes[j].equals(bnodes[j - 1])) {
         bnodes2.push(bnodes[j])
@@ -359,7 +361,11 @@ export default class UpdateManager {
   /**
    * @private
    */
-  fire (uri, query, callbackFunction) {
+  fire (
+    uri: string,
+    query: string,
+    callbackFunction: CallBackFunction
+  ): Promise<void> {
     return Promise.resolve()
       .then(() => {
         if (!uri) {
@@ -386,7 +392,7 @@ export default class UpdateManager {
 
         console.log('UpdateManager: update Ok for <' + uri + '>')
 
-        callbackFunction(uri, response.ok, response.responseText, response)
+        callbackFunction(uri, response.ok, response.responseText as string, response)
       })
       .catch(err => {
         callbackFunction(uri, false, err.message, err)
@@ -426,7 +432,7 @@ export default class UpdateManager {
     }
   }
 
-  insert_statement (st: TFQuad, callbackFunction) {
+  insert_statement (st: TFQuad, callbackFunction: CallBackFunction): void {
     var st0 = st instanceof Array ? st[0] : st
     var query = this.contextWhere(this.statementContext(st0))
 
@@ -444,7 +450,7 @@ export default class UpdateManager {
     this.fire(st0.graph.value, query, callbackFunction)
   }
 
-  delete_statement (st, callbackFunction) {
+  delete_statement (st: TFQuad | TFQuad[], callbackFunction: CallBackFunction): void {
     var st0 = st instanceof Array ? st[0] : st
     var query = this.contextWhere(this.statementContext(st0))
 
@@ -575,7 +581,7 @@ export default class UpdateManager {
    * @returns {boolean}
    */
   setRefreshHandler (doc: TFNamedNode, handler): boolean {
-    var wssURI = this.getUpdatesVia(doc) // relative
+    let wssURI = this.getUpdatesVia(doc) // relative
     // var kb = this.store
     var theHandler = handler
     var self = this
@@ -589,18 +595,20 @@ export default class UpdateManager {
     }
 
     wssURI = uriJoin(wssURI, doc.value)
-    wssURI = wssURI.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')
+    const validWssURI = wssURI.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:')
     console.log('Web socket URI ' + wssURI)
 
     var openWebsocket = function () {
       // From https://github.com/solid/solid-spec#live-updates
       var socket
       if (typeof WebSocket !== 'undefined') {
-        socket = new WebSocket(wssURI)
+        socket = new WebSocket(validWssURI)
+        //@ts-ignore Firefox Addon
       } else if (typeof Services !== 'undefined') { // Firefox add on http://stackoverflow.com/questions/24244886/is-websocket-supported-in-firefox-for-android-addons
+        //@ts-ignore Firefox Addon
         socket = (Services.wm.getMostRecentWindow('navigator:browser').WebSocket)(wssURI)
       } else if (typeof window !== 'undefined' && window.WebSocket) {
-        socket = window.WebSocket(wssURI)
+        socket = (window as any).WebSocket(validWssURI)
       } else {
         console.log('Live update disabled, as WebSocket not supported by platform :-(')
         return
@@ -617,7 +625,7 @@ export default class UpdateManager {
       var control = self.patchControlFor(doc)
       control.upstreamCount = 0
 
-      socket.onerror = function onerror (err) {
+      socket.onerror = function onerror (err: Error) {
         console.log('Error on Websocket:', err)
       }
 
@@ -634,9 +642,9 @@ export default class UpdateManager {
       // 1006  CLOSE_ABNORMAL  Reserved. Used to indicate that a connection was closed abnormally (
       //
       //
-      socket.onclose = function (event) {
+      socket.onclose = function (event: CloseEvent) {
         console.log('*** Websocket closed with code ' + event.code +
-          ", reason '" + event.reason + "' clean = " + event.clean)
+          ", reason '" + event.reason + "' clean = " + event.wasClean)
         retryTimeout *= 2
         retries += 1
         console.log('Retrying in ' + retryTimeout + 'ms') // (ask user?)
@@ -645,7 +653,7 @@ export default class UpdateManager {
           openWebsocket()
         }, retryTimeout)
       }
-      socket.onmessage = function (msg) {
+      socket.onmessage = function (msg: MessageEvent) {
         if (msg.data && msg.data.slice(0, 3) === 'pub') {
           if ('upstreamCount' in control) {
             control.upstreamCount -= 1
@@ -677,7 +685,13 @@ export default class UpdateManager {
   update(
       deletions: ReadonlyArray<Statement>,
       insertions: ReadonlyArray<Statement>,
-      callback?: (uri: string | undefined | null, success: boolean, errorBody?: string) => void
+      callback?: (
+        uri: string | undefined | null,
+        success: boolean,
+        errorBody?: string,
+        response?: Response | Error
+      ) => void,
+      secondTry?: boolean
   ): void | Promise<void> {
     if (!callback) {
       var thisUpdater = this
@@ -743,15 +757,15 @@ export default class UpdateManager {
         if (secondTry) {
           throw new Error('Update: Loaded ' + doc + "but stil can't figure out what editing protcol it supports.")
         }
-        console.log(`Update: have not loaded ${doc} before: loading now...`)
-        this.store.fetcher.load(doc).then(response => {
-          this.update(deletions, insertions, callback, true) // secondTry
+        console.log(`Update: have not loaded ${doc} before: loading now...`);
+        (this.store.fetcher.load(doc) as Promise<Response>).then(response => {
+          this.update(deletions, insertions, callback, true)
         }, err => {
           throw new Error(`Update: Can't read ${doc} before patching: ${err}`)
         })
         return
-      } else if (protocol.indexOf('SPARQL') >= 0) {
-        var bnodes = []
+      } else if ((protocol as string).indexOf('SPARQL') >= 0) {
+        var bnodes: TFBlankNode[] = []
         if (ds.length) bnodes = this.statementArrayBnodes(ds)
         if (is.length) bnodes = bnodes.concat(this.statementArrayBnodes(is))
         var context = this.bnodeContext(bnodes, doc)
@@ -798,10 +812,10 @@ export default class UpdateManager {
         }
 
         this.fire(doc.value, query, (uri, success, body, response) => {
-          response.elapsedTimeMs = Date.now() - startTime
+          (response as any).elapsedTimeMs = Date.now() - startTime
           console.log('    UpdateManager: Return ' +
-            (success ? 'success ' : 'FAILURE ') + response.status +
-            ' elapsed ' + response.elapsedTimeMs + 'ms')
+            (success ? 'success ' : 'FAILURE ') + (response as Response).status +
+            ' elapsed ' + (response as any).elapsedTimeMs + 'ms')
           if (success) {
             try {
               kb.remove(ds)
@@ -824,10 +838,10 @@ export default class UpdateManager {
             downstreamAction(doc)
           }
         })
-      } else if (protocol.indexOf('DAV') >= 0) {
+      } else if ((protocol as string).indexOf('DAV') >= 0) {
         this.updateDav(doc, ds, is, callback)
       } else {
-        if (protocol.indexOf('LOCALFILE') >= 0) {
+        if ((protocol as string).indexOf('LOCALFILE') >= 0) {
           try {
             this.updateLocalFile(doc, ds, is, callback)
           } catch (e) {
@@ -854,7 +868,7 @@ export default class UpdateManager {
       throw new Error('No record of our HTTP GET request for document: ' +
         doc)
     } // should not happen
-    var response = kb.any(request, this.ns.link('response'))
+    var response = kb.any(request as TFNamedNode, this.ns.link('response')) as TFSubject
     if (!response) {
       return null // throw "No record HTTP GET response for document: "+doc
     }
@@ -1012,20 +1026,16 @@ export default class UpdateManager {
   }
 
   /**
-     * This is suitable for an initial creation of a document.
-     * @param document
-     * @param data
-     * @param contentType
-     * @param callback
+   * This is suitable for an initial creation of a document.
    */
   put(
     doc: NamedNode,
-    data: string | ReadonlyArray<Statement>,
+    data: string | TFQuad[],
     contentType: string,
-    callback: (uri: string, ok: boolean, errorMessage: string, response?: unknown) => void,
+    callback: (uri: string, ok: boolean, errorMessage?: string, response?: unknown) => void,
   ): Promise<void> {
     const kb = this.store
-    let documentString
+    let documentString: string
 
     return Promise.resolve()
       .then(() => {
@@ -1067,17 +1077,27 @@ export default class UpdateManager {
    * @param doc {NamedNode}
    * @param callbackFunction
    */
-  reload (kb, doc: TFNamedNode, callbackFunction): void {
+  reload (
+    kb: IndexedFormula,
+    doc: docReloadType,
+    callbackFunction: (ok: boolean, message?: string, response?: Error | Response) => {} | void
+  ): void {
     var startTime = Date.now()
     // force sets no-cache and
-    const options = { force: true, noMeta: true, clearPreviousData: true }
+    const options = {
+      force: true,
+      noMeta: true,
+      clearPreviousData: true,
+    };
 
-    kb.fetcher.nowOrWhenFetched(doc.value, options, function (ok, body, response) {
+    (kb as any).fetcher.nowOrWhenFetched(doc.value, options, function (ok: boolean, body: Body, response: Response) {
       if (!ok) {
         console.log('    ERROR reloading data: ' + body)
         callbackFunction(false, 'Error reloading data: ' + body, response)
+        //@ts-ignore Where does onErrorWasCalled come from?
       } else if (response.onErrorWasCalled || response.status !== 200) {
         console.log('    Non-HTTP error reloading data! onErrorWasCalled=' +
+          //@ts-ignore Where does onErrorWasCalled come from?
           response.onErrorWasCalled + ' status: ' + response.status)
         callbackFunction(false, 'Non-HTTP error reloading data: ' + body, response)
       } else {
@@ -1097,4 +1117,9 @@ export default class UpdateManager {
       }
     })
   }
+}
+
+interface docReloadType extends TFNamedNode {
+  reloadTimeCount: number
+  reloadTimeTotal: number
 }
