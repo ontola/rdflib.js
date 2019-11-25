@@ -104,7 +104,7 @@ export default class Formula extends Node {
     this.initBindings = initBindings || []
     this.optional = optional || []
 
-    // TODO: Make CanonicalDataFactory comply with
+    // @ts-ignore CanonicalDataFactory does not comply with TF spec
     this.rdfFactory = (opts && opts.rdfFactory) || CanonicalDataFactory
     // Enable default factory methods on this while preserving factory context.
     for(const factoryMethod of appliedFactoryMethods) {
@@ -135,10 +135,10 @@ export default class Formula extends Node {
   }
 
   /** Add a statment object
-  * @param {Statement} statement - an existing constructed statement to add
-  */
-  addStatement (st: Statement): number {
-    return (this.statements as Statement[]).push(st)
+   * @param  statement - an existing constructed statement to add
+   */
+  addStatement (statement: TFQuad): number {
+    return (this.statements as TFQuad[]).push(statement)
   }
 
   /**
@@ -596,7 +596,7 @@ export default class Formula extends Node {
   connectedStatements(
     subject: TFSubject,
     doc: TFGraph,
-    excludePredicateURIs: ReadonlyArray<string>
+    excludePredicateURIs?: ReadonlyArray<string>
   ): TFQuad[] {
     excludePredicateURIs = excludePredicateURIs || []
     var todo: TFSubject[] = [subject]
@@ -614,7 +614,7 @@ export default class Formula extends Node {
       var sts = self.statementsMatching(null, null, x, doc)
         .concat(self.statementsMatching(x, null, null, doc))
       sts = sts.filter(function (st: TFQuad): boolean {
-        if (excludePredicateURIs[st.predicate.value]) return false
+        if (excludePredicateURIs && excludePredicateURIs[st.predicate.value]) return false
         var hash = (st as Statement).toNT()
         if (doneArcs[hash]) return false
         doneArcs[hash] = true
@@ -736,6 +736,7 @@ export default class Formula extends Node {
       return collection
     } else {
       const node = context.rdfFactory.blankNode()
+      // @ts-ignore incompatibility due to differences in DefaultGraph type
       const statements = arrayToStatements(context.rdfFactory, node, values)
       context.addAll(statements)
       return node

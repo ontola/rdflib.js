@@ -96,6 +96,8 @@ interface ExtendedResponse extends Response {
   req?: TFSubject
   size?: number
   timeout?: number
+  /** Used in UpdateManager.updateDav */
+  error?: string
 }
 
 /** tell typescript that a 'panes' child may exist on Window */
@@ -689,7 +691,7 @@ export default class Fetcher implements CallbackifyInterface {
   /** Keep track of explicit 404s -> we can overwrite etc */
   nonexistent: BooleanMap
   lookedUp: BooleanMap
-  handlers: Array<typeof Handler>
+  handlers: Array<Handler>
   static HANDLERS: {
     [handlerName: number]: Handler
   }
@@ -918,7 +920,7 @@ export default class Fetcher implements CallbackifyInterface {
 
     options = this.initFetchOptions(docuri, options)
 
-    return this.pendingFetchPromise(docuri, (options as AutoInitOptions).baseURI, options)
+    return this.pendingFetchPromise(docuri, (options as AutoInitOptions).baseURI, (options as AutoInitOptions))
   }
 
   pendingFetchPromise (
@@ -1735,7 +1737,7 @@ export default class Fetcher implements CallbackifyInterface {
   }
 
   addHandler (handler: Handler) {
-    this.handlers.push(handler)
+    this.handlers.push(handler);
     (handler as N3Handler).register(this)
   }
 
@@ -1966,7 +1968,7 @@ export default class Fetcher implements CallbackifyInterface {
       return null
     }
 
-    let Handler = this.handlers.find(handler => {
+    let Handler = this.handlers.find((handler: Handler) => {
       return contentType.match(handler.pattern)
     })
 
