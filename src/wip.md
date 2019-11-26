@@ -41,6 +41,8 @@ Builds upon the approved #363 PR for [typescript migration](https://github.com/l
 - `Fetcher.refreshIfExpired` passed an array of headers, but it needs only one string.
 - `Fethcer` uses `Headers` a lot. I've changed empty objects to empty `new Headers` instances, which enhances compatibility with default `Fetch` behavior.
 - `Serializer.tripleCallback` had an unused third argument.
+- `UpdateManager.update` checked an undefined `secondTry` variable. Since later in the same function, `.update` is called with a 4th argument, I assume this is `secondTry`. I've added it as an optional argument. Perhaps this is
+- `Formula.add()` now uses `this.rdfFactory.defaultGraph` instead of the non-existent `this.defaultGraph`
 
 ## Possible bugs not fixed by this PR
 
@@ -49,9 +51,13 @@ Builds upon the approved #363 PR for [typescript migration](https://github.com/l
 - `store.add()` accepts many types of inputs, but this will lead to invalid statements (e.g. a Literal as a Subject). I suggest we make this more strict and throw more errors on wrong inputs. Relates to #362. We could still make the allowed inputs bigger by allowing other types with some explicit behavior, e.g. in subject arguments, create `NamedNodes` from `URL` objects and `strings` that look like URLs . In any case, I thinkg the `Node.fromValue` behavior is too unpredictable for `store.add`. For now, I've updated the docs to match its behavior.
 - The types for `Node.fromValue` and `Literal.fromValue` show how unpredictable these methods are. I suggest we make them more strict (also relates to #362), so they either return a `TFTerm` (`node`) or throw an error - they should not return `undefined` or `null`. Also, I think they should be converted to functions in `Utils`: this would fix the circular dependency issue (why we need `node_internal`) and it would fix the type issues in `Literal.fromValue` (which tends to give issues since it's signature does not correctly extend from `Node.fromValue`)
 - In `Fetcher.addtype`, the final logic will allways return `true`, since `redirection` is a `NamedNode`. Should it call `.value`?
+- Various `Hanlder.parse()` functions in `Fetcher` return either a `Response` or a `Promise<Error>`. This seems like weird behavior - should it not always return an array?
 - The `defaultGraph` iri is set to `chrome:theSession`, but this errors in Firefox. I suggest we change it to something else. See #370.
 - The `Parse.executeErrorCallback` conditional logic is always `true`.
-- Many `// @ts-ignore` comments for possible bugs.
+- I've added many `// @ts-ignore` comments. Ideally, these should be resolved by fixing the underlying type issues.
+- `UpdateManager.update_statement` seems to refer to the wrong `this`. It calls `this.anonimize`, but it is not available in that scope.
+- `UpdateManager.updateLocalFile` uses `Component`, but this is not defined anywhere. Is this deprecated?
+- `Data-factory-internal.id()` returns `string | undefined`, I feel like undefined should not be possible - it should throw an error. This would resolve the type incompatibility on line 146.
 
 ## Unused code
 
@@ -74,6 +80,7 @@ Builds upon the approved #363 PR for [typescript migration](https://github.com/l
 - Many functions in `Fetcher` assume that specific `Opts` are defined. I've included all these in a single `Options` type and added documentation for the props I understood. I've also created an `AutoInitOptions` type, which sets auto-initialized. I extended Options in each function where specific opts seemed to be required. I'm not entirely confident about the types I've set. I feel like the truly required items should never be `Opts`, since they aren't optional. Refactoring this requires a seperate PR.
 - `Fetcher.load` allows arrays as inputs. This causes the output types to be more unpredictable. `Promise<Result> | Result[]`. I suggest splitting this in two functions, e.g. add `loadMany`
 - `Utils.callbackify` seems to be used only in `Fetcher`.
+- `UpdateManager.editable` has a confusing return type (`string | boolean | undefined`). I suggest we refactor it to always return one of multiple pre-defined strings,.
 
 ## Some thoughts on simplifying language
 

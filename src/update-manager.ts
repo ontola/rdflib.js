@@ -15,7 +15,7 @@ import { isStore, isNamedNode, isTFBlankNode, nodeValue } from './utils'
 import * as Util from './util'
 import Statement from './statement';
 import { NamedNode } from './index'
-import { TFNamedNode, TFQuad, TFBlankNode, TFSubject } from './types'
+import { TFNamedNode, TFQuad, TFBlankNode, TFSubject, TFPredicate, TFObject, TFGraph, TFTerm } from './types'
 
 interface UpdateManagerFormula extends IndexedFormula {
   fetcher: Fetcher
@@ -423,11 +423,14 @@ export default class UpdateManager {
         var query = this.where
         query += 'DELETE DATA { ' + this.statementNT + ' } ;\n'
         query += 'INSERT DATA { ' +
+          // @ts-ignore `this` might refer to the wrong scope. Does this work?
           this.anonymize(this.statement[0]) + ' ' +
+          // @ts-ignore
           this.anonymize(this.statement[1]) + ' ' +
+          // @ts-ignore
           this.anonymize(obj) + ' ' + ' . }\n'
 
-        updater.fire(this.statement[3].value, query, callbackFunction)
+        updater.fire((this.statement as [TFSubject, TFPredicate, TFObject, TFGraph])[3].value, query, callbackFunction)
       }
     }
   }
@@ -547,14 +550,14 @@ export default class UpdateManager {
           }
         } else {
           control.reloading = false
-          if (response.status === 0) {
+          if ((response as Response).status === 0) {
             console.log('Network error refreshing the data. Retrying in ' +
               retryTimeout / 1000)
             control.reloading = true
             retryTimeout = retryTimeout * 2
             setTimeout(tryReload, retryTimeout)
           } else {
-            console.log('Error ' + response.status + 'refreshing the data:' +
+            console.log('Error ' + (response as Response).status + 'refreshing the data:' +
               message + '. Stopped' + doc)
           }
         }
@@ -860,7 +863,12 @@ export default class UpdateManager {
     }
   }
 
-  updateDav (doc, ds, is, callbackFunction) {
+  updateDav (
+    doc: TFSubject,
+    ds,
+    is,
+    callbackFunction
+  ): null | Promise<void> {
     let kb = this.store
     // The code below is derived from Kenny's UpdateCenter.js
     var request = kb.any(doc, this.ns.link('request'))
@@ -872,7 +880,7 @@ export default class UpdateManager {
     if (!response) {
       return null // throw "No record HTTP GET response for document: "+doc
     }
-    var contentType = kb.the(response, this.ns.httph('content-type')).value
+    var contentType = (kb.the(response, this.ns.httph('content-type'))as TFTerm).value
 
     // prepare contents of revised document
     let newSts = kb.statementsMatching(undefined, undefined, undefined, doc).slice() // copy!
@@ -958,7 +966,9 @@ export default class UpdateManager {
     console.log('Writing back: <<<' + documentString + '>>>')
     var filename = doc.value.slice(7) // chop off   file://  leaving /path
     // console.log("Writeback: Filename: "+filename+"\n")
+    // @ts-ignore Where does Component come from? Perhaps deprecated?
     var file = Components.classes[ '@mozilla.org/file/local;1' ]
+    // @ts-ignore Where does Component come from? Perhaps deprecated?
       .createInstance(Components.interfaces.nsILocalFile)
     file.initWithPath(filename)
     if (!file.exists()) {
@@ -970,7 +980,9 @@ export default class UpdateManager {
     // }
     // create file output stream and use write/create/truncate mode
     // 0x02 writing, 0x08 create file, 0x20 truncate length if exist
+    // @ts-ignore Where does Component come from? Perhaps deprecated?
     var stream = Components.classes[ '@mozilla.org/network/file-output-stream;1' ]
+    // @ts-ignore Where does Component come from? Perhaps deprecated?
       .createInstance(Components.interfaces.nsIFileOutputStream)
 
     // Various JS systems object to 0666 in struct mode as dangerous
@@ -1120,6 +1132,6 @@ export default class UpdateManager {
 }
 
 interface docReloadType extends TFNamedNode {
-  reloadTimeCount: number
-  reloadTimeTotal: number
+  reloadTimeCount?: number
+  reloadTimeTotal?: number
 }

@@ -193,7 +193,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     patch: {
         delete?: ReadonlyArray<Statement>,
         patch?: ReadonlyArray<Statement>,
-        where?: unknown
+        where?: any
     },
     target: NamedNode,
     patchCallback: (errorString: string) => void
@@ -331,7 +331,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * @param why - The document in which the triple (S,P,O) was or will be stored on the web
    * @returns The statement added to the store, or the store
    */
-  //@ts-ignore differs from signature in Formula
+  // @ts-ignore differs from signature in Formula
   add (
     subj: TFSubject | TFQuad | TFQuad[] | Statement | Statement[],
     pred?: TFPredicate,
@@ -355,7 +355,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     var st: TFQuad
     if (!why) {
       // system generated
-      why = this.fetcher ? this.fetcher.appNode : this.defaultGraph()
+      why = this.fetcher ? this.fetcher.appNode : this.rdfFactory.defaultGraph()
     }
     if (typeof subj == 'string') {
       subj = new NamedNode(subj)

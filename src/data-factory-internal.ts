@@ -11,6 +11,7 @@ import {
   GraphType,
   TermType,
   TFDataFactory,
+  TFTerm,
 } from './types'
 import { Feature, IdentityFactory, Indexable } from './data-factory-type'
 import { Node } from './index'
@@ -37,7 +38,7 @@ function defaultGraph(): NamedNode {
  *
  * Equivalent to {Term.hashString}
  */
-function id (term: Node): string | undefined {
+function id (term: TFTerm): string | undefined {
   if (!term) {
     return term
   }
@@ -45,7 +46,7 @@ function id (term: Node): string | undefined {
     return (term as NamedNode).id()
   }
   if (Object.prototype.hasOwnProperty.call(term, "hashString")) {
-    return term.hashString()
+    return (term as Node).hashString()
   }
 
   switch (term.termType) {
@@ -142,6 +143,7 @@ const CanonicalDataFactory: TFDataFactory<
   namedNode,
   quad,
   variable,
+  // @ts-ignore id should return an Indexable value, but in RDFlib can return `undefined`
   id,
   supports: {
     [Feature.collections]: false,

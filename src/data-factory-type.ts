@@ -1,4 +1,4 @@
-import { TFNamedNode, TFBlankNode, TFLiteral, TFQuad, TFTerm, TFDataFactory, TFDefaultGraph, TFSubject, TFPredicate, TFObject, TFGraph } from "./types"
+import { TFNamedNode, TFBlankNode, TFLiteral, TFQuad, TFTerm, TFDataFactory, TFSubject, TFPredicate, TFObject, TFGraph, TFVariable } from "./types"
 
 /**
  * Defines a strict subset of the DataFactory as defined in the RDF/JS: Data model specification
@@ -46,11 +46,11 @@ export interface DataFactory<
   toNQ(term: FactoryTypes): string
 }
 
-export type TFIDFactoryTypes = TFNamedNode | TFBlankNode | TFLiteral | TFQuad
+export type TFIDFactoryTypes = TFNamedNode | TFBlankNode | TFLiteral | TFQuad | TFVariable | TFTerm
 
 export interface IdentityFactory<
   Quad = TFQuad,
-  IDFactoryTypes = TFNamedNode | TFBlankNode | TFLiteral | Quad,
+  IDFactoryTypes = TFNamedNode | TFBlankNode | TFLiteral | Quad | TFVariable | TFTerm,
   IndexType = Indexable,
 > {
   /**

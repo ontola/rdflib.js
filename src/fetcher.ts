@@ -38,9 +38,11 @@ import { isTFNamedNode, isCollection, nodeValue } from './utils'
 import * as Util from './util'
 import serialize from './serialize'
 
+// @ts-ignore This is injected
 import { fetch as solidAuthCli } from 'solid-auth-cli'
+// @ts-ignore This is injected
 import { fetch as solidAuthClient } from 'solid-auth-client'
-import { TFBlankNode, TFNamedNode, TFTerm, TFGraph, TFSubject, ContentType } from './types'
+import { TFBlankNode, TFNamedNode, TFGraph, TFSubject, ContentType } from './types'
 import Literal from './literal'
 
 // This is a special fetch which does OIDC auth, catching 401 errors
@@ -691,7 +693,7 @@ export default class Fetcher implements CallbackifyInterface {
   /** Keep track of explicit 404s -> we can overwrite etc */
   nonexistent: BooleanMap
   lookedUp: BooleanMap
-  handlers: Array<Handler>
+  handlers: Array<typeof Handler>
   static HANDLERS: {
     [handlerName: number]: Handler
   }
@@ -907,10 +909,11 @@ export default class Fetcher implements CallbackifyInterface {
   load (
     uri: TFNamedNode | string | Array<string | TFNamedNode>,
     options: Options = {}
-  ): Promise<Result> | Result[] {
+  ): Promise<Result> | Promise<Result>[] {
     options = Object.assign({}, options) // Take a copy as we add stuff to the options!!
     if (uri instanceof Array) {
       return Promise.all(
+        // @ts-ignore Returns an array of promises. Without this ignore, the type is recursive
         uri.map(x => { return this.load(x, Object.assign({}, options)) })
       )
     }
@@ -1552,7 +1555,7 @@ export default class Fetcher implements CallbackifyInterface {
   lookUpThing (
     term: TFNamedNode,
     rterm: TFNamedNode
-  ): Promise<Response> | Response[] {
+  ): Promise<Response> | Promise<Response>[] {
     let uris = this.store.uris(term)  // Get all URIs
     uris = uris.map(u => Uri.docpart(u))  // Drop hash fragments
 
@@ -1560,6 +1563,7 @@ export default class Fetcher implements CallbackifyInterface {
       this.lookedUp[u] = true
     })
 
+    // @ts-ignore Recursive type
     return this.load(uris, { referringTerm: rterm })
   }
 
@@ -1583,7 +1587,7 @@ export default class Fetcher implements CallbackifyInterface {
       if (request !== undefined) {
         let response = kb.any(request, ns.link('response')) as TFSubject
 
-        if (response !== undefined && kb.anyValue(response, ns.http('status')) && kb.anyValue(response, ns.http('status')).startsWith('2')) {
+        if (response !== undefined && kb.anyValue(response, ns.http('status')) && (kb.anyValue(response, ns.http('status')) as string).startsWith('2')) {
           // Only look at success returns - not 401 error messagess etc
           let results = kb.each(response, ns.httph(header.toLowerCase()))
 
@@ -1733,12 +1737,12 @@ export default class Fetcher implements CallbackifyInterface {
 
   unload (term: TFNamedNode) {
     this.store.removeDocument(term)
-    delete this.requested[term.value] // So it can be loaded again
+    delete this.requested[term.value] // So it can be load2ed again
   }
 
-  addHandler (handler: Handler) {
+  addHandler (handler: typeof Handler) {
     this.handlers.push(handler);
-    (handler as N3Handler).register(this)
+    (handler as any).register(this)
   }
 
   retryNoCredentials (
@@ -1852,6 +1856,7 @@ export default class Fetcher implements CallbackifyInterface {
     docuri: string,
     options: AutoInitOptions
   ): Promise<FetchError | ExtendedResponse> | ExtendedResponse {
+
     const kb = this.store
     const headers: Headers = (response as Response).headers
 
@@ -1942,7 +1947,8 @@ export default class Fetcher implements CallbackifyInterface {
       return this.doneFetch(options, response)
     }
 
-    return response.text()
+    return response
+      .text()
       .then(responseText => {
         response.responseText = responseText
         return (handler as N3Handler).parse(this, responseText, options, response)
@@ -1968,10 +1974,11 @@ export default class Fetcher implements CallbackifyInterface {
       return null
     }
 
-    let Handler = this.handlers.find((handler: Handler) => {
+    let Handler = this.handlers.find(handler => {
       return contentType.match(handler.pattern)
     })
 
+    // @ts-ignore in practice all Handlers have constructors.
     return Handler ? new Handler(response) : null
   }
 
