@@ -1352,7 +1352,7 @@ export default class Fetcher implements CallbackifyInterface {
    * If only one was flagged as looked up, then the new node is looked up again,
    * which will make sure all the URIs are dereferenced
    */
-  nowKnownAs (was: NamedNode, now: NamedNode): void {
+  nowKnownAs (was: TFSubject, now: TFSubject): void {
     if (this.lookedUp[was.value]) {
       // Transfer userCallback
       if (!this.lookedUp[now.value]) {
@@ -1553,8 +1553,8 @@ export default class Fetcher implements CallbackifyInterface {
    *   (for tracking bad links)
    */
   lookUpThing (
-    term: TFNamedNode,
-    rterm: TFNamedNode
+    term: TFSubject,
+    rterm: TFSubject
   ): Promise<Response> | Promise<Response>[] {
     let uris = this.store.uris(term)  // Get all URIs
     uris = uris.map(u => Uri.docpart(u))  // Drop hash fragments
@@ -1949,6 +1949,7 @@ export default class Fetcher implements CallbackifyInterface {
 
     return response
       .text()
+      // @ts-ignore Types seem right
       .then(responseText => {
         response.responseText = responseText
         return (handler as N3Handler).parse(this, responseText, options, response)

@@ -56,7 +56,7 @@ export default class BlankNode extends Node implements TFBlankNode {
     this.value = this.id
   }
 
-  compareTerm (other) {
+  compareTerm (other: BlankNode): number {
     if (this.classOrder < other.classOrder) {
       return -1
     }

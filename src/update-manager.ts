@@ -11,7 +11,7 @@ import DataFactory from './data-factory'
 import Namespace from './namespace'
 import Serializer from './serializer'
 import { join as uriJoin } from './uri'
-import { isStore, isNamedNode, isTFBlankNode, nodeValue } from './utils'
+import { isStore, isTFBlankNode, nodeValue } from './utils'
 import * as Util from './util'
 import Statement from './statement';
 import { NamedNode } from './index'
@@ -98,9 +98,9 @@ export default class UpdateManager {
 
     if ((uri as string).slice(0, 8) === 'file:///') {
       if (kb.holds(
-            kb.sym(uri),
-            DataFactory.namedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'),
-            DataFactory.namedNode('http://www.w3.org/2007/ont/link#MachineEditableDocument'))) {
+          this.store.rdfFactory.namedNode(uri),
+          this.store.rdfFactory.namedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'),
+          this.store.rdfFactory.namedNode('http://www.w3.org/2007/ont/link#MachineEditableDocument'))) {
         return 'LOCALFILE'
       }
 
@@ -128,7 +128,7 @@ export default class UpdateManager {
     // https://github.com/solid/node-solid-server/pull/1313
     // Once that release has been published to the major Pod hosters, the commit that introduced
     // this statement should be reverted:
-    if (kb.holds(DataFactory.namedNode(uri), this.ns.rdf('type'), this.ns.ldp('Resource'))) {
+    if (kb.holds(this.store.rdfFactory.namedNode(uri), this.ns.rdf('type'), this.ns.ldp('Resource'))) {
         return 'SPARQL'
     }
     var method: string

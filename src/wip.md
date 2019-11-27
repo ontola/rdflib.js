@@ -43,12 +43,13 @@ Builds upon the approved #363 PR for [typescript migration](https://github.com/l
 - `Serializer.tripleCallback` had an unused third argument.
 - `UpdateManager.update` checked an undefined `secondTry` variable. Since later in the same function, `.update` is called with a 4th argument, I assume this is `secondTry`. I've added it as an optional argument. Perhaps this is
 - `Formula.add()` now uses `this.rdfFactory.defaultGraph` instead of the non-existent `this.defaultGraph`
+- `IndexedFormula.replaceWith` now passes a Node instead of a string to `.add` in the `if (big.value)` block
 
-## Possible bugs not fixed by this PR
+## Possible bugs discovered, which are not fixed by this PR
 
 - `Formula.substitute` uses `this.add(Statments[])`, which will crash. I think it should be removed, since `IndexedFormula.substitute` is used all the time anyway.
 - The `Formula.serialize` function calls `serialize.ts` with only one argument, so without a store. I think this will crash every time. Also`Formula.serialize` uses `this.namespaces`, but this is only defined in `IndexedFormula`. Is it rotten code and should it be removed?
-- `store.add()` accepts many types of inputs, but this will lead to invalid statements (e.g. a Literal as a Subject). I suggest we make this more strict and throw more errors on wrong inputs. Relates to #362. We could still make the allowed inputs bigger by allowing other types with some explicit behavior, e.g. in subject arguments, create `NamedNodes` from `URL` objects and `strings` that look like URLs . In any case, I thinkg the `Node.fromValue` behavior is too unpredictable for `store.add`. For now, I've updated the docs to match its behavior.
+- `IndexedFormula.add()` accepts many types of inputs, but this will lead to invalid statements (e.g. a Literal as a Subject). I suggest we make this more strict and throw more errors on wrong inputs. Relates to #362. We could still make the allowed inputs bigger by allowing other types with some explicit behavior, e.g. in subject arguments, create `NamedNodes` from `URL` objects and `strings` that look like URLs . In any case, I thinkg the `Node.fromValue` behavior is too unpredictable for `store.add`. For now, I've updated the docs to match its behavior.
 - The types for `Node.fromValue` and `Literal.fromValue` show how unpredictable these methods are. I suggest we make them more strict (also relates to #362), so they either return a `TFTerm` (`node`) or throw an error - they should not return `undefined` or `null`. Also, I think they should be converted to functions in `Utils`: this would fix the circular dependency issue (why we need `node_internal`) and it would fix the type issues in `Literal.fromValue` (which tends to give issues since it's signature does not correctly extend from `Node.fromValue`)
 - In `Fetcher.addtype`, the final logic will allways return `true`, since `redirection` is a `NamedNode`. Should it call `.value`?
 - Various `Hanlder.parse()` functions in `Fetcher` return either a `Response` or a `Promise<Error>`. This seems like weird behavior - should it not always return an array?
@@ -58,16 +59,13 @@ Builds upon the approved #363 PR for [typescript migration](https://github.com/l
 - `UpdateManager.update_statement` seems to refer to the wrong `this`. It calls `this.anonimize`, but it is not available in that scope.
 - `UpdateManager.updateLocalFile` uses `Component`, but this is not defined anywhere. Is this deprecated?
 - `Data-factory-internal.id()` returns `string | undefined`, I feel like undefined should not be possible - it should throw an error. This would resolve the type incompatibility on line 146.
-
-## Unused code
-
+- `IndexedFormula.copy` runs `.copy` on a Collection, but that method is not available there.
 - `IndexedFormula.predicateCallback` is checked, but never used in this codebase.
-- The `optional` argument in `formula.js` does not seem to be documented, used or tested - should it be removed?
 
 ## Other things I noticed
 
 - Literals can apparently be `null` or `undefined`, when nodes are created using the `.fromValue` method. This causes faulty behavior. This happens in the `new Statement()` constructor as well. See #362.
-- The `IndexedFormula.add()` method has logic for Statement array inputs and store inputs, but this behavior is not documented. It also refers to `this.fetcher` and `this.defaultGraph`, which both should not be available.
+- The `IndexedFormula.add()` method has logic for Statement array inputs and store inputs, but this behavior is not documented. It also refers to `this.fetcher` and `this.defaultGraph`, which both should not be available. I've added types that accept these arrays.
 - The filenames of major classes differ from their default exports, e.g. `store.ts` is called `IndexedFormula`.
 - Aliases (e.g. `IndexedFormula.match` for `IndexefFormula.statementsMatching`) introduce complexity, documentation and type duplication. I suggest adding deprecation warnings.
 - The various calling methods of `Fetcher.nowOrWhenFetched` are quite dynamic. A simpler, stricter input type might be preferable.
@@ -81,6 +79,15 @@ Builds upon the approved #363 PR for [typescript migration](https://github.com/l
 - `Fetcher.load` allows arrays as inputs. This causes the output types to be more unpredictable. `Promise<Result> | Result[]`. I suggest splitting this in two functions, e.g. add `loadMany`
 - `Utils.callbackify` seems to be used only in `Fetcher`.
 - `UpdateManager.editable` has a confusing return type (`string | boolean | undefined`). I suggest we refactor it to always return one of multiple pre-defined strings,.
+- The `optional` argument in `formula.js` does not seem to be documented, used or tested - should it be removed?
+
+## Need review
+
+- Some of the `Formula` and `IndexedFormula` functions (e.g. `anyStatementMatching`) might have too strict types - perhaps Collections are allowed in some of them.
+- `IndexedFormula.declareExistential` & `newExistential` have different assumptions on types - should they be blanknodes or namednodes?
+- `IndexedFormula.check` passes a single statement to `checkStatementList`, which expects an array
+- I've added many type assertions (e.g. `as TFObject`), but Ideally, these do not exist. Ultimately, these should be replaced by TypeGuards that work on runtime/
+- The `data-factory-types` are quite complex. This is a result of the differences between the RDF//JS Taskforce spec and rdflib itself. Perhaps there is an easier / cleaner way to setup the types (without heavy use of generics), but I'm afraid I can't think of one.
 
 ## Some thoughts on simplifying language
 

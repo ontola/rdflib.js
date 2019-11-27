@@ -3,11 +3,20 @@ import CanonicalDataFactory from './data-factory-internal'
 import Fetcher from './fetcher'
 import Literal from './literal'
 import Statement from './statement'
-import { ValueType, TFNamedNode, TFSubject, TFPredicate, TFObject, TFGraph, SubjectType, PredicateType, ObjectType, GraphType } from './types'
+import { ValueType, TFNamedNode, SubjectType, PredicateType, ObjectType, GraphType, TFBlankNode, TFLiteral, TFQuad, TFVariable } from './types'
 import IndexedFormula from './store'
-import Formula from './formula'
-import { DataFactory } from './data-factory-type'
+import { DataFactory, Indexable, SupportTable } from './data-factory-type'
 import { NamedNode } from './index'
+
+const RDFlibjsSupports: SupportTable = {
+  COLLECTIONS: true,
+  DEFAULT_GRAPH_TYPE: true,
+  EQUALS_METHOD: true,
+  VARIABLE_TYPE: true,
+  IDENTITY: false,
+  REVERSIBLE_ID: false,
+  ID: false,
+}
 
 /**
  * Data factory which also supports Collections
@@ -18,34 +27,30 @@ const ExtendedTermFactory = {
   ...CanonicalDataFactory,
   collection,
   id,
-  supports: {
-    COLLECTIONS: true,
-    DEFAULT_GRAPH_TYPE: true,
-    EQUALS_METHOD: true,
-    NODE_LOOKUP: false,
-    VARIABLE_TYPE: true,
-  }
+  supports: RDFlibjsSupports
 }
 
 interface IRDFlibDataFactory extends DataFactory<NamedNode> {
-  fetcher: (store: Formula, options: any) => Fetcher
+  fetcher: (store: IndexedFormula, options: any) => Fetcher
   graph: (features, opts) => IndexedFormula
   lit: (val: string, lang?: string, dt?: TFNamedNode) => Literal
   st: (
-    subject: TFSubject,
-    predicate: TFPredicate,
-    object: TFObject,
-    graph?: TFGraph
+    subject: SubjectType,
+    predicate: PredicateType,
+    object: ObjectType,
+    graph?: GraphType
   ) => Statement
   triple: (
-    subject: TFSubject,
-    predicate: TFPredicate,
-    object: TFObject
+    subject: SubjectType,
+    predicate: PredicateType,
+    object: ObjectType
   ) => Statement
 }
 
-/** Full RDFLib.js Data Factory */
-const RDFlibDataFactory: IRDFlibDataFactory = {
+/** Full RDFLib.js Data Factory
+ *  @todo Add missing functions (isQuad, equals, toNQ), so Partial can be removed
+ */
+const RDFlibDataFactory: Partial<IRDFlibDataFactory> = {
   ...ExtendedTermFactory,
   fetcher,
   graph,
@@ -56,22 +61,22 @@ const RDFlibDataFactory: IRDFlibDataFactory = {
 
 export default RDFlibDataFactory
 
-function id (term) {
+function id (term: TFNamedNode | TFBlankNode | TFLiteral | Collection ): Indexable {
   if (!term) {
     return term
   }
-  if (Object.prototype.hasOwnProperty.call(term, "id") && typeof term.id === "function") {
-    return term.id()
+  if (Object.prototype.hasOwnProperty.call(term, "id") && typeof (term as NamedNode).id === "function") {
+    return (term as NamedNode).id()
   }
   if (Object.prototype.hasOwnProperty.call(term, "hashString")) {
-    return term.hashString()
+    return (term as NamedNode).hashString()
   }
 
   if (term.termType === "Collection") {
     Collection.toNT(term)
   }
 
-  return CanonicalDataFactory.id(term)
+  return CanonicalDataFactory.id(term as NamedNode)
 }
 /**
  * Creates a new collection
@@ -85,7 +90,7 @@ function collection(elements: ReadonlyArray<ValueType>): Collection {
  * @param store - The store to use
  * @param options - The options
  */
-function fetcher(store: Formula, options: any): Fetcher {
+function fetcher(store: IndexedFormula, options: any): Fetcher {
   return new Fetcher(store, options)
 }
 /**
@@ -125,9 +130,9 @@ function st(
  * @param object The object
  */
 function triple(
-  subject: TFSubject,
-  predicate: TFPredicate,
-  object: TFObject
+  subject: SubjectType,
+  predicate: PredicateType,
+  object: ObjectType
 ): Statement {
   return CanonicalDataFactory.quad(subject, predicate, object)
 }

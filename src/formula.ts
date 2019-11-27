@@ -7,7 +7,7 @@ import Namespace from './namespace'
 import Node from './node-internal'
 import Serializer from './serialize'
 import Statement from './statement'
-import { appliedFactoryMethods, arrayToStatements, isTFStatement, nodeValue } from './utils'
+import { appliedFactoryMethods, arrayToStatements, isTFStatement, nodeValue, isTFSubject } from './utils'
 import {
   TFTerm,
   TFPredicate,
@@ -686,9 +686,9 @@ export default class Formula extends Node {
    * @param g A containing graph
    */
   holds(
-    s?: TFSubject | null,
+    s?: TFSubject | TFSubject[] | null,
     p?: TFPredicate | null,
-    o?: TFObject | null,
+    o?: TFObject | Collection |  null,
     g?: TFGraph | null
   ): boolean {
     var i
@@ -708,7 +708,7 @@ export default class Formula extends Node {
       }
     }
 
-    var st = this.anyStatementMatching(s, p, o, g)
+    var st = this.anyStatementMatching(s as TFSubject, p, o as TFObject, g)
     return st != null
   }
 
@@ -791,7 +791,7 @@ export default class Formula extends Node {
     sz.suggestNamespaces(this.namespaces)
     sz.setBase(base)
     if (provenance) {
-      sts = this.statementsMatching(void 0, void 0, void 0, new NamedNode(provenance))
+      sts = this.statementsMatching(void 0, void 0, void 0, this.rdfFactory.namedNode(provenance))
     } else {
       sts = this.statements
     }
@@ -830,7 +830,10 @@ export default class Formula extends Node {
 
   /**
    * Gets an named node for an URI
+   *
+   * Deprecated -- use this.rdfFactory.namedNode(uriString)
    * @param uri The URI
+   *
    */
   sym(uri: string | TFNamedNode, name?: any): TFNamedNode {
     if (name) {

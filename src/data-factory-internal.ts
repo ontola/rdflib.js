@@ -12,6 +12,7 @@ import {
   TermType,
   TFDataFactory,
   TFTerm,
+  TFLiteral,
 } from './types'
 import { Feature, IdentityFactory, Indexable } from './data-factory-type'
 import { Node } from './index'
@@ -71,7 +72,7 @@ function id (term: TFTerm): string | undefined {
 function literal(
   value: string,
   languageOrDatatype?: string | TFNamedNode
-): Literal {
+): TFLiteral {
   if (typeof value !== "string" && !languageOrDatatype) {
     return Literal.fromValue(value) as Literal
   }
@@ -149,8 +150,9 @@ const CanonicalDataFactory: TFDataFactory<
     [Feature.collections]: false,
     [Feature.defaultGraphType]: true,
     [Feature.equalsMethod]: true,
-    [Feature.identity]: true,
-    [Feature.reversibleIdentity]: false,
+    [Feature.identity]: false,
+    [Feature.id]: true,
+    [Feature.reversibleId]: false,
     [Feature.variableType]: true,
   }
 }

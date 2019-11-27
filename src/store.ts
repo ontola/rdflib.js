@@ -20,14 +20,14 @@
 import ClassOrder from './class-order'
 import { defaultGraphURI } from './data-factory-internal'
 import Formula, { FormulaOpts } from './formula'
-import { ArrayIndexOf, isTFStatement, isStore, nodeValue, isTFSubject, isTFPredicate, isTFObject, isTFGraph, isStatement } from './utils'
+import { ArrayIndexOf, isTFStatement, isStore, isTFSubject, isTFPredicate, isTFGraph } from './utils'
 import Node from './node'
 import Variable from './variable'
 import { Query, indexedFormulaQuery } from './query'
 import { RDFArrayRemove } from './util';
 import UpdateManager from './update-manager';
-import { Bindings, TFTerm, TFPredicate, TFSubject, TFObject, TFGraph, TFQuad, SubjectType, PredicateType, ObjectType, GraphType, TFNamedNode, TFBlankNode } from './types'
-import { NamedNode, Collection } from './index'
+import { Bindings, TFTerm, TFPredicate, TFSubject, TFObject, TFGraph, TFQuad, TFNamedNode, TFBlankNode } from './types'
+import { NamedNode, Collection, Fetcher } from './index'
 import Statement from './statement';
 import { Indexable } from './data-factory-type'
 import { isRDFObject } from './utils'
@@ -40,7 +40,12 @@ export { defaultGraphURI }
 // var link_ns = 'http://www.w3.org/2007/ont/link#'
 
 // Handle Functional Property
-function handleFP (formula: IndexedFormula, subj: TFSubject, pred: TFPredicate, obj: TFObject): boolean {
+function handleFP (
+  formula: IndexedFormula,
+  subj: TFSubject,
+  pred: TFPredicate,
+  obj: TFObject
+): boolean {
   var o1 = formula.any(subj, pred, undefined)
   if (!o1) {
     return false // First time with this value
@@ -51,7 +56,12 @@ function handleFP (formula: IndexedFormula, subj: TFSubject, pred: TFPredicate, 
 } // handleFP
 
 // Handle Inverse Functional Property
-function handleIFP (formula: IndexedFormula, subj: TFSubject, pred: TFPredicate, obj: TFObject): boolean {
+function handleIFP (
+  formula: IndexedFormula,
+  subj: TFSubject,
+  pred: TFPredicate,
+  obj: TFObject
+): boolean {
   var s1 = formula.any(undefined, pred, obj)
   if (!s1) {
     return false // First time with this value
@@ -200,7 +210,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   ): void {
     var targetKB = this
     var ds
-    var binding = null
+    var binding: Bindings | null = null
 
     function doPatch (onDonePatch: Function) {
       if (patch['delete']) {
@@ -210,7 +220,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
         if (binding) ds = ds.substitute(binding)
         // console.log('applyPatch: delete: ' + ds)
         ds = ds.statements as Statement[]
-        var bad = []
+        var bad: TFQuad[] = []
         var ds2 = ds.map(function (st: TFQuad) { // Find the actual statemnts in the store
           var sts = targetKB.statementsMatching(st.subject, st.predicate, st.object, target)
           if (sts.length === 0) {
@@ -250,12 +260,14 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
       query.pat.statements.map(function (st) {
         st.graph = target
       })
-      //@ts-ignore TODO: add sync property to Query
+      //@ts-ignore TODO: add sync property to Query when converting Query to typescript
       query.sync = true
 
-      var bindingsFound = []
+      var bindingsFound: Bindings[] = []
 
-      targetKB.query(query, function onBinding (binding) {
+      targetKB.query(
+        query,
+        function onBinding (binding) {
         bindingsFound.push(binding)
         // console.log('   got a binding: ' + bindingDebug(binding))
       },
@@ -358,13 +370,13 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
       why = this.fetcher ? this.fetcher.appNode : this.rdfFactory.defaultGraph()
     }
     if (typeof subj == 'string') {
-      subj = new NamedNode(subj)
+      subj = this.rdfFactory.namedNode(subj)
     }
     pred = Node.fromValue(pred)
     obj = Node.fromValue(obj)
     why = Node.fromValue(why)
     if (!isTFSubject(subj)) {
-      throw "Subject is not a subject type"
+      throw new Error("Subject is not a subject type")
     }
     if (!isTFPredicate(pred)) {
       throw `Predicate ${pred} is not a predicate type`
@@ -404,6 +416,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
       this.id(this.canon(obj as TFObject)),
       this.id(this.canon(why as TFGraph))
     ]
+    // @ts-ignore this will fail if you pass a collection and the factory does not allow Collections
     st = this.rdfFactory.quad(subj, pred, obj, why)
     for (i = 0; i < 4; i++) {
       var ix = this.index[i]
@@ -444,6 +457,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
       var ix = this.index[p]
       for (var key in ix) {
         if (ix.hasOwnProperty(key)) {
+          // @ts-ignore should this pass an array or a single statement? checkStateMentsList expects an array.
           this.checkStatementList(ix[key], p)
         }
       }
@@ -455,7 +469,10 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * @param sts - The list of statements to check
    * @param from - An index with the array ['subject', 'predicate', 'object', 'why']
    */
-  checkStatementList(sts: ReadonlyArray<TFQuad>, from?: number): boolean | void {
+  checkStatementList(
+    sts: ReadonlyArray<TFQuad>,
+    from?: number
+  ): boolean | void {
     if (from === undefined) {
       from = 0
     }
@@ -487,7 +504,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
         }
       }
       if (!arrayContains(this.statements, st)) {
-        throw new Error('Statement list does not statement ' + st + '@' + st.why + origin)
+        throw new Error('Statement list does not statement ' + st + '@' + st.graph + origin)
       }
     }
   }
@@ -499,10 +516,11 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     return this
   }
 
-  compareTerm(u1: Node, u2: Node): number {
+  // @ts-ignore incompatible with Forumala.compareTerm
+  compareTerm(u1: TFTerm, u2: TFTerm): number {
     // Keep compatibility with downstream classOrder changes
     if (Object.prototype.hasOwnProperty.call(u1, "compareTerm")) {
-      return u1.compareTerm(u2)
+      return (u1 as Node).compareTerm(u2 as Node)
     }
     if (ClassOrder[u1.termType] < ClassOrder[u2.termType]) {
       return -1
@@ -528,8 +546,8 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * @param flags Whether or not to do a two-directional copy and/or delete triples
    */
   copyTo(
-    template: Node,
-    target: Node,
+    template: TFSubject,
+    target: TFSubject,
     flags?: Array<('two-direction' | 'delete')>
   ): void {
     if (!flags) flags = []
@@ -545,7 +563,9 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
           break
         case 'Literal':
         case 'BlankNode':
+        // @ts-ignore Collections can appear here
         case 'Collection':
+          // @ts-ignore Possible bug: copy is not available on Collections
           this.add(target, st.predicate, st.object.copy(this))
       }
       if (ArrayIndexOf(flags, 'delete') !== -1) {
@@ -557,15 +577,15 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   /**
    * Simplify graph in store when we realize two identifiers are equivalent
    * We replace the bigger with the smaller.
-   * @param u1 The first node
-   * @param u2 The second node
+   * @param u1in The first node
+   * @param u2in The second node
    */
-  equate(u1: TFTerm, u2: TFTerm): boolean {
+  equate(u1in: TFTerm, u2in : TFTerm): boolean {
     // log.warn("Equating "+u1+" and "+u2); // @@
     // @@JAMBO Must canonicalize the uris to prevent errors from a=b=c
     // 03-21-2010
-    u1 = this.canon(u1)
-    u2 = this.canon(u2)
+    const u1 = this.canon(u1in) as TFSubject
+    const u2 = this.canon(u2in) as TFSubject
     var d = this.compareTerm(u1, u2)
     if (!d) {
       return true // No information in {a = a}
@@ -644,6 +664,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   newExistential(uri: string): TFTerm {
     if (!uri) return this.bnode()
     var x = this.sym(uri)
+    // @ts-ignore x should be blanknode, but is namedNode.
     return this.declareExistential(x)
   }
 
@@ -654,7 +675,12 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    */
   newPropertyAction(
     pred: TFPredicate,
-    action: (store: IndexedFormula, subject: TFSubject, object: TFObject) => boolean
+    action: (
+      store: IndexedFormula,
+      subject: TFSubject,
+      predicate: TFPredicate,
+      object: TFObject
+    ) => boolean
   ): boolean {
     // log.debug("newPropertyAction:  "+pred)
     var hash = this.id(pred)
@@ -712,7 +738,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   query(
     myQuery: Query,
     callback: (bindings: Bindings) => void,
-    dummy?: null,
+    dummy?: Fetcher | null,
     onDone?: () => void
   ): void {
     return indexedFormulaQuery.call(this, myQuery, callback, dummy, onDone)
@@ -724,14 +750,15 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * @param myQuery The query to be run
    */
   querySync(myQuery: Query): any[] {
+    var results: Bindings[] = []
     function saveBinginds (bindings: Bindings) {
       results.push(bindings)
     }
     function onDone () {
       done = true
     }
-    var results = []
     var done = false
+    // @ts-ignore TODO: Add .sync to Query
     myQuery.sync = true
 
     indexedFormulaQuery.call(this, myQuery, saveBinginds, null, onDone)
@@ -858,7 +885,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
   /**
    * Replace big with small, obsoleted with obsoleting.
    */
-  replaceWith (big: TFTerm, small: TFTerm): boolean {
+  replaceWith (big: TFSubject, small: TFSubject): boolean {
     // log.debug("Replacing "+big+" with "+small) // this.id(@@
     var oldhash = this.id(big)
     var newhash = this.id(small)
@@ -892,7 +919,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
           this.aliases[newhash].push(this.aliases[oldhash][i])
         }
       }
-      this.add(small, this.sym('http://www.w3.org/2007/ont/link#uri'), big.value)
+      this.add(small, this.sym('http://www.w3.org/2007/ont/link#uri'), big)
       // If two things are equal, and one is requested, we should request the other.
       if (this.fetcher) {
         this.fetcher.nowKnownAs(big, small)
@@ -1013,12 +1040,12 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
     }
     // Ok, we have picked the shortest index but now we have to filter it
     var pBest = given[iBest]
-    var possibles = this.index[pBest][hash[pBest]]
+    var possibles: TFQuad[] = this.index[pBest][hash[pBest]]
     var check = given.slice(0, iBest).concat(given.slice(iBest + 1)) // remove iBest
-    var results = []
+    var results: TFQuad[] = []
     var parts = [ 'subject', 'predicate', 'object', 'why' ]
     for (var j = 0; j < possibles.length; j++) {
-      var st = possibles[j]
+      var st: TFQuad | null = possibles[j]
 
       for (i = 0; i < check.length; i++) { // for each position to be checked
         p = check[i]
@@ -1039,7 +1066,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    * A list of all the URIs by which this thing is known
    * @param term
    */
-  uris(term: TFNamedNode): string[] {
+  uris(term: TFSubject): string[] {
     var cterm = this.canon(term)
     var terms = this.aliases[this.id(cterm)]
     if (!cterm.value) return []

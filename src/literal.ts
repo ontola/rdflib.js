@@ -13,6 +13,7 @@ export function isTFLiteral<T>(value: T | TFTerm): value is TFLiteral {
  * An RDF literal node, containing something different than a URI.
  * @link https://rdf.js.org/data-model-spec/#literal-interface
  */
+// @ts-ignore Incorrectly extends due to fromValue()
 export default class Literal extends Node implements TFLiteral {
 
   termType: LiteralTermType

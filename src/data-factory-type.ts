@@ -35,9 +35,7 @@ export interface DataFactory<
 
   supports: SupportTable
 
-  literal(value: string, languageOrDatatype?: string | NamedNode): TFLiteral
-
-  literal(value: unknown): Literal
+  literal(value: string, languageOrDatatype?: string | TFNamedNode): Literal
 
   isQuad(obj: any): obj is Quad
 
@@ -81,6 +79,7 @@ export interface ReversibleIdentityFactory<
 export type Namespace = (term:string) => TFNamedNode
 export type NamespaceCreator = (ns: string) => Namespace
 
+/** A set of features that may be supported by a Data Factory */
 export type SupportTable = Record<Feature, boolean>
 
 export enum Feature {
@@ -90,10 +89,12 @@ export enum Feature {
   defaultGraphType = "DEFAULT_GRAPH_TYPE",
   /** Whether the factory supports equals on produced instances */
   equalsMethod = "EQUALS_METHOD",
-  /** Whether the factory can generate a unique session-idempotent identifier for a given object */
+  /** Whether the factory can create a unique idempotent identifier for the given term. */
+  id = "ID",
+  /** Whether the factory will return the same instance for subsequent calls (implies `===`). */
   identity = "IDENTITY",
-  /** Whether the factory supports mapping ids back to instances */
-  reversibleIdentity = "REVERSIBLE_IDENTITY",
+  /** Whether the factory supports mapping ids back to instances (should adhere to the identity setting) */
+  reversibleId = "REVERSIBLE_ID",
   /** Whether the factory supports termType:Variable terms */
   variableType = "VARIABLE_TYPE",
 }
