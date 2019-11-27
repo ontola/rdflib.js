@@ -304,7 +304,7 @@ export default class Formula extends Node {
     for (k in types) {
       if (!types.hasOwnProperty(k)) continue
       v = types[k]
-      subs = this.each(void 0, this.sym('http://www.w3.org/2000/01/rdf-schema#subClassOf'), this.sym(k))
+      subs = this.each(void 0, this.rdfFactory.namedNode('http://www.w3.org/2000/01/rdf-schema#subClassOf'), this.rdfFactory.namedNode(k))
       bottom = true
       i = 0
       for (len = subs.length; i < len; i++) {
@@ -423,18 +423,18 @@ export default class Formula extends Node {
     seeds = {}
     seeds[thisClass.toNT()] = true
     members = {}
-    ref = this.transitiveClosure(seeds, this.sym('http://www.w3.org/2000/01/rdf-schema#subClassOf'), true)
+    ref = this.transitiveClosure(seeds, this.rdfFactory.namedNode('http://www.w3.org/2000/01/rdf-schema#subClassOf'), true)
     for (t in ref) {
       if (!ref.hasOwnProperty(t)) continue
       ref1 = this.statementsMatching(void 0,
-        this.sym('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'),
+        this.rdfFactory.namedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#type'),
         this.fromNT(t))
       for (i = 0, len = ref1.length; i < len; i++) {
         st = ref1[i]
         members[st.subject.toNT()] = st
       }
       ref2 = this.each(void 0,
-        this.sym('http://www.w3.org/2000/01/rdf-schema#domain'),
+        this.rdfFactory.namedNode('http://www.w3.org/2000/01/rdf-schema#domain'),
         this.fromNT(t))
       for (l = 0, len1 = ref2.length; l < len1; l++) {
         pred = ref2[l] as TFPredicate
@@ -445,7 +445,7 @@ export default class Formula extends Node {
         }
       }
       ref4 = this.each(void 0,
-        this.sym('http://www.w3.org/2000/01/rdf-schema#range'),
+        this.rdfFactory.namedNode('http://www.w3.org/2000/01/rdf-schema#range'),
         this.fromNT(t))
       for (q = 0, len3 = ref4.length; q < len3; q++) {
         pred = ref4[q] as TFPredicate
@@ -490,7 +490,7 @@ export default class Formula extends Node {
     var types = {}
     types[subject.toNT()] = true
     return this.transitiveClosure(types,
-      this.sym('http://www.w3.org/2000/01/rdf-schema#subClassOf'), true)
+      this.rdfFactory.namedNode('http://www.w3.org/2000/01/rdf-schema#subClassOf'), true)
   }
 
   /**
@@ -511,7 +511,7 @@ export default class Formula extends Node {
     var types = {}
     types[subject.toNT()] = true
     return this.transitiveClosure(types,
-      this.sym('http://www.w3.org/2000/01/rdf-schema#subClassOf'))
+      this.rdfFactory.namedNode('http://www.w3.org/2000/01/rdf-schema#subClassOf'))
   }
 
   /**
@@ -551,7 +551,7 @@ export default class Formula extends Node {
       if (st.predicate.value === rdftype) {
         types[st.object.toNT()] = st
       } else {
-        ref1 = this.each(st.predicate, this.sym('http://www.w3.org/2000/01/rdf-schema#domain'))
+        ref1 = this.each(st.predicate, this.rdfFactory.namedNode('http://www.w3.org/2000/01/rdf-schema#domain'))
         for (l = 0, len1 = ref1.length; l < len1; l++) {
           range = ref1[l]
           types[(range as Node).toNT()] = st
@@ -561,13 +561,13 @@ export default class Formula extends Node {
     ref2 = this.statementsMatching(void 0, void 0, subject) as Statement[]
     for (m = 0, len2 = ref2.length; m < len2; m++) {
       st = ref2[m]
-      ref3 = this.each(st.predicate, this.sym('http://www.w3.org/2000/01/rdf-schema#range'))
+      ref3 = this.each(st.predicate, this.rdfFactory.namedNode('http://www.w3.org/2000/01/rdf-schema#range'))
       for (q = 0, len3 = ref3.length; q < len3; q++) {
         domain = ref3[q]
         types[(domain as Node).toNT()] = st
       }
     }
-    return this.transitiveClosure(types, this.sym('http://www.w3.org/2000/01/rdf-schema#subClassOf'), false)
+    return this.transitiveClosure(types, this.rdfFactory.namedNode('http://www.w3.org/2000/01/rdf-schema#subClassOf'), false)
   }
 
   /**
@@ -651,7 +651,7 @@ export default class Formula extends Node {
     var dt: TFNamedNode | undefined, k: number, lang: string | undefined
     switch (str[0]) {
       case '<':
-        return this.sym(str.slice(1, -1))
+        return this.rdfFactory.namedNode(str.slice(1, -1))
       case '"':
         lang = void 0
         dt = void 0
@@ -831,14 +831,14 @@ export default class Formula extends Node {
   /**
    * Gets an named node for an URI
    *
-   * Deprecated -- use this.rdfFactory.namedNode(uriString)
    * @param uri The URI
-   *
+   * @deprecated use this.rdfFactory.namedNode(uriString)
    */
   sym(uri: string | TFNamedNode, name?: any): TFNamedNode {
     if (name) {
       throw new Error('This feature (kb.sym with 2 args) is removed. Do not assume prefix mappings.')
     }
+    console.warn("formula.sym() is deprecated - use store.rdfFactory.namedNode(uri)")
     const uriString = nodeValue(uri)
     return this.rdfFactory.namedNode(uriString)
   }
@@ -935,7 +935,7 @@ export default class Formula extends Node {
       if (!types.hasOwnProperty(k)) continue
       v = types[k]
       n = 0
-      ref = this.each(this.sym(k), this.sym('http://www.w3.org/2000/01/rdf-schema#subClassOf'))
+      ref = this.each(this.rdfFactory.namedNode(k), this.rdfFactory.namedNode('http://www.w3.org/2000/01/rdf-schema#subClassOf'))
       for (i = 0, len = ref.length; i < len; i++) {
         j = ref[i]
         if (j.value !== 'http://www.w3.org/2000/01/rdf-schema#Resource') {

@@ -14,13 +14,18 @@ Builds upon the approved #363 PR for [typescript migration](https://github.com/l
 - Migrated `formula`, `variable`, `store`, `update-manager`, `data-factory`, `default-graph`, `namespace`, `parse`,`serialize`, `parse`, `uri` and `utils` tot ts.
 - Added `fork-ts-checker-webpack-plugin`, which enables errors in the log when ts errors occur.
 - Added and implemented RDF/JS Taskforce (TF) types, included these in the `types.ts` file. I tried implementing the TF types in the major classes, but some of the incompatibilities make it difficult. Many available methods on rdfjs instances (e.g. `.toNt()` in NamedNode), are missing in TF classes. To improve TF comatibility, we should minimize using rdflib specific functions. This would for example enable using Forumla methods on RDFExt nodes. We should use the Taskforce types (TFTerm, TFQuad) as much as possible, instead of rdflib types (Node, Statement).
-- Variables (from rdfjs taskforce) make typings a lot more complex (many methods would require explicit type checks, e.g. you can't serialize a variable to N-Triples), so I disabled them.
-- Switched internal calls from `sameTerm` to `equals` in order to comply to TF spec, so that these functions also work with external datafactories.
 - Added typeguards, e.g. `isTFNamedNode` and `isTFPredicate` in `Utils`, and used these at various locations.
 - Use enums for `termType` and `contentType`, without breaking compatibility with regular strings.
 - `Formula` Constructor arguments are optional - since some functions initialize empty Formulas.
 - In `Formula.fromNT()` `return this.literal(str, lang || dt)` seemed wrong, converted it to
 - The various `fromValue` methods conflict with the base Node class, type wise. Since they don't use `this`, I feel like they should be converted to functions.
+
+## Compatibility with RDFJS taskforce and external datafactories
+
+- Variables (from rdfjs taskforce) make typings a lot more complex (many methods would require explicit type checks, e.g. you can't serialize a variable to N-Triples), so I disabled them.
+- Switched internal calls from `sameTerm` to `equals` in order to comply to TF spec, so that these functions also work with external datafactories. Alias still exists, so nothing changes externally.
+- Switched internal calls from `.why` to `graph`. Alias still exists, so nothing changes externally.
+- Calls to `kb.sym` have been replaced with `kb.rdfFactory.namedNode`, which makes all these functions more compatible with external datafactories. Added a deprecation warning to `.sym`.
 
 ## Minor fixes
 
@@ -61,6 +66,7 @@ Builds upon the approved #363 PR for [typescript migration](https://github.com/l
 - `Data-factory-internal.id()` returns `string | undefined`, I feel like undefined should not be possible - it should throw an error. This would resolve the type incompatibility on line 146.
 - `IndexedFormula.copy` runs `.copy` on a Collection, but that method is not available there.
 - `IndexedFormula.predicateCallback` is checked, but never used in this codebase.
+
 
 ## Other things I noticed
 

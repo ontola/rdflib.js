@@ -979,9 +979,9 @@ export default class Fetcher implements CallbackifyInterface {
       options.force = true
     }
 
-    options.resource = kb.sym(uri) // This might be proxified
+    options.resource = kb.rdfFactory.namedNode(uri) // This might be proxified
     options.baseURI = options.baseURI || uri // Preserve though proxying etc
-    options.original = kb.sym(options.baseURI)
+    options.original = kb.rdfFactory.namedNode(options.baseURI)
     options.req = kb.bnode()
     options.headers = options.headers || new Headers
 
@@ -1269,19 +1269,19 @@ export default class Fetcher implements CallbackifyInterface {
     let kb = this.store
     let predicate
     // See http://www.w3.org/TR/powder-dr/#httplink for describedby 2008-12-10
-    let obj = kb.sym(Uri.join(uri, originalUri.value))
+    let obj = kb.rdfFactory.namedNode(Uri.join(uri, originalUri.value))
 
     if (rel === 'alternate' || rel === 'seeAlso' || rel === 'meta' ||
         rel === 'describedby') {
       if (obj.value === originalUri.value) { return }
       predicate = ns.rdfs('seeAlso')
     } else if (rel === 'type') {
-      predicate = kb.sym('http://www.w3.org/1999/02/22-rdf-syntax-ns#type')
+      predicate = kb.rdfFactory.namedNode('http://www.w3.org/1999/02/22-rdf-syntax-ns#type')
     } else {
       // See https://www.iana.org/assignments/link-relations/link-relations.xml
       // Alas not yet in RDF yet for each predicate
       // encode space in e.g. rel="shortcut icon"
-      predicate = kb.sym(
+      predicate = kb.rdfFactory.namedNode(
         Uri.join(encodeURIComponent(rel),
           'http://www.iana.org/assignments/link-relations/')
       )
@@ -1393,7 +1393,7 @@ export default class Fetcher implements CallbackifyInterface {
       .then(response => {
         this.requested[uri] = 404
         this.nonexistent[uri] = true
-        this.unload(this.store.sym(uri))
+        this.unload(this.store.rdfFactory.namedNode(uri))
 
         return response
       })
@@ -1668,7 +1668,7 @@ export default class Fetcher implements CallbackifyInterface {
     let uris = this.store.uris(term) // Get all URIs
     if (typeof uris !== 'undefined') {
       for (let i = 0; i < uris.length; i++) {
-        this.refresh(this.store.sym(Uri.docpart(uris[i])))
+        this.refresh(this.store.rdfFactory.namedNode(Uri.docpart(uris[i])))
         // what about rterm?
       }
     }
@@ -1829,19 +1829,19 @@ export default class Fetcher implements CallbackifyInterface {
     if (locURI) {
       var reqURI = kb.any(prev, ns.link('requestedURI'))
       if (reqURI && reqURI.value !== locURI) {
-        kb.add(kb.sym(locURI), ns.rdf('type'), rdfType, this.appNode)
+        kb.add(kb.rdfFactory.namedNode(locURI), ns.rdf('type'), rdfType, this.appNode)
       }
     }
     for (;;) {
       const doc = kb.any(prev, ns.link('requestedURI'))
       if (doc && doc.value) {
-        kb.add(kb.sym(doc.value), ns.rdf('type'), rdfType, this.appNode)
+        kb.add(kb.rdfFactory.namedNode(doc.value), ns.rdf('type'), rdfType, this.appNode)
       } // convert Literal
-      prev = kb.any(undefined, kb.sym('http://www.w3.org/2007/ont/link#redirectedRequest'), prev) as TFSubject
+      prev = kb.any(undefined, kb.rdfFactory.namedNode('http://www.w3.org/2007/ont/link#redirectedRequest'), prev) as TFSubject
       if (!prev) { break }
-      var response = kb.any(prev, kb.sym('http://www.w3.org/2007/ont/link#response'))
+      var response = kb.any(prev, kb.rdfFactory.namedNode('http://www.w3.org/2007/ont/link#response'))
       if (!response) { break }
-      var redirection = kb.any((response as TFNamedNode), kb.sym('http://www.w3.org/2007/ont/http#status'))
+      var redirection = kb.any((response as TFNamedNode), kb.rdfFactory.namedNode('http://www.w3.org/2007/ont/http#status'))
       if (!redirection) { break }
       // @ts-ignore always true?
       if ((redirection !== '301') && (redirection !== '302')) { break }
@@ -1915,10 +1915,10 @@ export default class Fetcher implements CallbackifyInterface {
         contentType.includes('application/pdf')
 
       if (contentType && isImage) {
-        this.addType(kb.sym('http://purl.org/dc/terms/Image'), reqNode, kb,
+        this.addType(kb.rdfFactory.namedNode('http://purl.org/dc/terms/Image'), reqNode, kb,
           docuri)
         if (diffLocation) {
-          this.addType(kb.sym('http://purl.org/dc/terms/Image'), reqNode, kb,
+          this.addType(kb.rdfFactory.namedNode('http://purl.org/dc/terms/Image'), reqNode, kb,
             diffLocation)
         }
       }
@@ -2028,7 +2028,7 @@ export default class Fetcher implements CallbackifyInterface {
     const oldReq = options.req  // request metadata blank node
 
     if (!options.noMeta) {
-      kb.add(oldReq, ns.link('redirectedTo'), kb.sym(newURI), oldReq)
+      kb.add(oldReq, ns.link('redirectedTo'), kb.rdfFactory.namedNode(newURI), oldReq)
       this.addStatus(oldReq, 'redirected to new request') // why
     }
 
