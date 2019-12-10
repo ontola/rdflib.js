@@ -9,7 +9,6 @@ import { DataFactory } from './factories/factory-types'
 import IndexedFormula from './store'
 import Fetcher from './fetcher'
 import Statement from './statement'
-import Empty from './empty'
 import { NamedNode, Term } from './tf-types'
 
 /**
@@ -75,7 +74,7 @@ export type SubjectType = RDFlibBlankNode | RDFlibNamedNode | RDFlibVariable
 /** An RDF/JS Predicate */
 export type PredicateType = RDFlibNamedNode | RDFlibVariable
 /** An RDF/JS Object */
-export type ObjectType = RDFlibNamedNode | RDFlibLiteral | Collection | RDFlibBlankNode | RDFlibVariable | Empty
+export type ObjectType = RDFlibNamedNode | RDFlibLiteral | Collection | RDFlibBlankNode | RDFlibVariable
 /** An RDF/JS Graph */
 export type GraphType = RDFlibDefaultGraph | RDFlibNamedNode | RDFlibVariable // | Formula
 

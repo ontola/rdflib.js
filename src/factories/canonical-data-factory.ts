@@ -17,7 +17,7 @@ import {
   DefaultFactoryTypes,
   Feature,
 } from './factory-types'
-import { isQuad, isTerm } from '../utils/terms'
+import { isQuad, isTerm, isStatement } from '../utils/terms'
 import { NamedNode as TFNamedNode, Quad, Term } from '../tf-types'
 
 export { defaultGraphURI } from '../utils/default-graph-uri'
@@ -93,7 +93,7 @@ const CanonicalDataFactory: DataFactory = {
       return 'undefined'
     }
 
-    if (isQuad(term)) {
+    if (isStatement(term)) {
       return this.quadToNQ(term)
     }
 
@@ -107,7 +107,6 @@ const CanonicalDataFactory: DataFactory = {
         if (nq) {
           return nq
         }
-
         throw new Error(`Can't id term with type '${term.termType}'`)
     }
   },

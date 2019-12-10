@@ -64,7 +64,7 @@ export function isLiteral(value: any): value is Literal {
 }
 
 /** TypeGuard for RDF/JS TaskForce Quads */
-export function isQuad(obj: any): obj is Quad<any, any, any, any> {
+export function isQuad(obj: any): obj is Quad {
   return typeof obj === "object" && obj !== null && (
     'subject' in obj
     && 'predicate' in obj

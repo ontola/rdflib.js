@@ -1,15 +1,29 @@
 import { SupportTable } from './factories/factory-types'
 import {
-  BlankNodeTermType,
-  DefaultGraphTermType,
   LiteralTermType,
-  NamedNodeTermType,
-  VariableTermType,
 } from './types'
+import {
+  Variable,
+  DefaultGraph,
+  NamedNode,
+  BlankNode,
+  // BaseQuad as Quad,
+} from 'rdf-js'
+import { Collection } from './index'
+export {
+  Variable,
+  DefaultGraph,
+  NamedNode,
+  BlankNode,
+  // BaseQuad as Quad,
+} from 'rdf-js'
 
 /**
- * RDF/JS taskforce Term
- * @link https://rdf.js.org/data-model-spec/#term-interface
+ * Parent Interface of all Term types.
+ *
+ * Differs from rdf-js implementation, because the equals
+ * method accepts should also accept Collections,
+ * which is a Term that is not present in rdf-js.
  */
 export interface Term {
   termType: string
@@ -24,37 +38,35 @@ export interface Term {
 }
 
 /**
- * RDF/JS taskforce NamedNode
- * @link https://rdf.js.org/data-model-spec/#namednode-interface
+ * An RDF quad, taking any Term in its positions, containing the subject, predicate, object and graph terms.
  */
-export interface NamedNode extends Term {
-  termType: NamedNodeTermType
-  value: string
-}
+export interface Quad {
+  /**
+   * The subject.
+   * @see Quad_Subject
+   */
+  subject: Quad_Subject;
+  /**
+   * The predicate.
+   * @see Quad_Predicate
+   */
+  predicate: Quad_Predicate;
+  /**
+   * The object.
+   * @see Quad_Object
+   */
+  object: Quad_Object | Collection;
+  /**
+   * The named graph.
+   * @see Quad_Graph
+   */
+  graph: Quad_Graph;
 
-/**
- * RDF/JS taskforce Literal
- * @link https://rdf.js.org/data-model-spec/#literal-interface
- */
-export interface BlankNode extends Term {
-  termType: BlankNodeTermType
-  value: string
-}
-
-/**
- * RDF/JS taskforce Quad
- * @link https://rdf.js.org/data-model-spec/#quad-interface
- */
-export interface Quad<
-  S extends Term = Quad_Subject,
-  P extends Term = Quad_Predicate,
-  O extends Term = Quad_Object,
-  G extends Term = Quad_Graph
-> {
-  subject: S
-  predicate: P
-  object: O
-  graph: G
+  /**
+   * @param other The term to compare with.
+   * @return True if and only if the argument is a) of the same type b) has all components equal.
+   */
+  equals(other: Quad): boolean;
 }
 
 /**
@@ -73,29 +85,6 @@ export interface Literal extends Term {
   language: string
   /** A NamedNode whose IRI represents the datatype of the literal. */
   datatype: NamedNode
-}
-
-/**
- * RDF/JS taskforce Variable
- * @link https://rdf.js.org/data-model-spec/#variable-interface
- */
-export interface Variable extends Term {
-  /** Contains the constant "Variable". */
-  termType: VariableTermType
-  /** The name of the variable without leading "?" (example: "a"). */
-  value: string
-}
-
-/**
- * RDF/JS taskforce DefaultGraph
- * An instance of DefaultGraph represents the default graph.
- * It's only allowed to assign a DefaultGraph to the graph property of a Quad.
- * @link https://rdf.js.org/data-model-spec/#defaultgraph-interface
- */
-export interface DefaultGraph extends Term {
-  termType: DefaultGraphTermType;
-  /** should return and empty string'' */
-  value: string;
 }
 
 /**
@@ -153,7 +142,7 @@ export interface TFDataFactory {
     predicate: Term,
     object: Term,
     graph?: Term,
-  ) => Quad<any, any, any, any>
+  ) => Quad
 
   /**
    * Check for specific features/behaviour on the factory.
@@ -167,7 +156,7 @@ export interface TFDataFactory {
 export type Quad_Subject = NamedNode | BlankNode | Variable
 /** A RDF/JS taskforce Predicate */
 export type Quad_Predicate = NamedNode | Variable
-/** A RDF/JS taskforce Object */
-export type Quad_Object = NamedNode | BlankNode | Literal | Variable
+/** A RDF/JS taskforce Object, but with Collections */
+export type Quad_Object = NamedNode | BlankNode | Literal | Variable | Collection
 /** A RDF/JS taskforce Graph */
 export type Quad_Graph = NamedNode | DefaultGraph | BlankNode | Variable

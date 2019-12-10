@@ -43,7 +43,7 @@ export function fromValue <T extends FromValueReturns<C> = any, C extends Node =
  * Use generic T to control the contents of the array.
  */
 export default class Collection<
-  T extends Node = Node | RdflibBlankNode | Collection<any> | Literal | Variable
+  T extends Node = Node | RdflibBlankNode | Literal | Variable
 > extends Node implements Term {
   static termType = TermType.Collection
 

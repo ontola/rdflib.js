@@ -77,7 +77,7 @@ export interface DataFactory<
     predicate: Term,
     object: Term,
     graph?: Term,
-  ): Statement;
+  ): Quad;
 
   quadToNQ(term: Statement | Quad): string
 

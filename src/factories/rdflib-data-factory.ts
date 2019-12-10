@@ -4,7 +4,7 @@ import {
   PredicateType,
   SubjectType,
 } from '../types'
-import Literal from '../literal'
+import RDFlibLiteral from '../literal'
 import Statement from '../statement'
 import IndexedFormula from '../store'
 import Fetcher from '../fetcher'
@@ -38,7 +38,7 @@ const RDFlibDataFactory: IRDFlibDataFactory = {
    * @param dt The datatype
    * @deprecated use {literal} with the second and third argument combined
    */
-  lit (val: string, lang?: string, dt?: NamedNode): Literal {
+  lit (val: string, lang?: string, dt?: NamedNode): RDFlibLiteral {
     return this.literal('' + val, lang || dt)
   },
 

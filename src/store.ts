@@ -393,7 +393,7 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
    */
   // @ts-ignore differs from signature in Formula
   add (
-    subj: Quad_Subject | Quad | Quad[] | Statement | Statement[],
+    subj: Quad_Subject | Quad | Quad[] | Statement | Statement[] | IndexedFormula,
     pred?: Quad_Predicate,
     obj?: Term,
     why?: Quad_Graph
@@ -405,9 +405,11 @@ export default class IndexedFormula extends Formula { // IN future - allow pass 
           this.add(subj[i])
         }
       } else if (isQuad(subj)) {
-        this.add(subj.subject, subj.predicate, subj.object, subj.graph)
+        const quad = subj as Quad
+        this.add(quad.subject, quad.predicate, quad.object, quad.graph)
       } else if (isStore(subj)) {
-        this.add(subj.statements)
+        const store = subj as IndexedFormula
+        this.add(store.statements)
       }
       return this
     }
